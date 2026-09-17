@@ -330,15 +330,28 @@ async function checkSystemHealth() {
     const waRes = await fetch('http://localhost:3001/health');
     if (waRes.ok) {
       const waData = await waRes.json();
-      const statusText = waData.status === 'connected' ? 'CONNECTED' : 'ACTIVE (SCAN QR IN TERMINAL)';
-      const modalEl = document.getElementById('botStatusModalText');
-      if (modalEl) modalEl.textContent = `Bot daemon listening on port 3001: ${statusText}`;
-      const pillDot = document.querySelector('#whatsappPill .status-dot');
-      if (pillDot) pillDot.className = 'status-dot dot-active';
+      const isConn = waData.status === 'connected';
+      const pill = document.getElementById('whatsappPill');
+      const pillDot = pill ? pill.querySelector('.status-dot') : null;
+      const pillVal = pill ? pill.querySelector('.status-value') : null;
+
+      if (pillDot) {
+        pillDot.className = isConn ? 'status-dot dot-active' : 'status-dot dot-warn';
+      }
+      if (pillVal) {
+        if (isConn && waData.connectedPhone) {
+          pillVal.textContent = `+${waData.connectedPhone}`;
+        } else if (!isConn) {
+          pillVal.textContent = 'PAIR BOT';
+        }
+      }
     }
   } catch (e) {
-    const modalEl = document.getElementById('botStatusModalText');
-    if (modalEl) modalEl.textContent = 'Bot daemon offline. Run command above to start.';
+    const pill = document.getElementById('whatsappPill');
+    const pillDot = pill ? pill.querySelector('.status-dot') : null;
+    const pillVal = pill ? pill.querySelector('.status-value') : null;
+    if (pillDot) pillDot.className = 'status-dot dot-neutral';
+    if (pillVal) pillVal.textContent = 'OFFLINE';
   }
 }
 
@@ -450,11 +463,8 @@ function setupEventListeners() {
     }
   });
 
-  // Terminal Pairing Modal
-  const modal = document.getElementById('qrModal');
-  document.getElementById('openQrModalBtn').addEventListener('click', () => modal.classList.add('open'));
-  document.getElementById('closeQrModalBtn').addEventListener('click', () => modal.classList.remove('open'));
-  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+  // Setup Interactive WhatsApp Modal
+  setupWhatsAppModal();
 }
 
 function appendMessage(sender, text, bubbleClass) {
@@ -480,4 +490,255 @@ function appendMessage(sender, text, bubbleClass) {
 function removeMessage(id) {
   const el = document.getElementById(id);
   if (el) el.remove();
+}
+
+// ==========================================================
+// WhatsApp Modal Controller (Pairing Code & Live QR)
+// ==========================================================
+let waModalInterval = null;
+let currentActiveCode = null;
+
+function setupWhatsAppModal() {
+  const modal = document.getElementById('qrModal');
+  const openBtn = document.getElementById('openQrModalBtn');
+  const closeBtn = document.getElementById('closeQrModalBtn');
+  const headerPill = document.getElementById('whatsappPill');
+
+  if (openBtn) openBtn.addEventListener('click', openModal);
+  if (headerPill) {
+    headerPill.style.cursor = 'pointer';
+    headerPill.addEventListener('click', openModal);
+  }
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  function openModal() {
+    if (!modal) return;
+    modal.classList.add('open');
+    pollWhatsAppModalStatus();
+    if (waModalInterval) clearInterval(waModalInterval);
+    waModalInterval = setInterval(pollWhatsAppModalStatus, 3000);
+  }
+
+  function closeModal() {
+    if (!modal) return;
+    modal.classList.remove('open');
+    if (waModalInterval) {
+      clearInterval(waModalInterval);
+      waModalInterval = null;
+    }
+  }
+
+  // Tab switching
+  const tabPairing = document.getElementById('tabBtnPairing');
+  const tabQr = document.getElementById('tabBtnQr');
+  const contentPairing = document.getElementById('tabContentPairing');
+  const contentQr = document.getElementById('tabContentQr');
+
+  if (tabPairing && tabQr) {
+    tabPairing.addEventListener('click', () => {
+      tabPairing.classList.add('active');
+      tabQr.classList.remove('active');
+      if (contentPairing) contentPairing.style.display = 'flex';
+      if (contentQr) contentQr.style.display = 'none';
+    });
+
+    tabQr.addEventListener('click', () => {
+      tabQr.classList.add('active');
+      tabPairing.classList.remove('active');
+      if (contentPairing) contentPairing.style.display = 'none';
+      if (contentQr) contentQr.style.display = 'flex';
+      fetchLiveQr();
+    });
+  }
+
+  // Request Pairing Code
+  const btnGetCode = document.getElementById('btnGetPairingCode');
+  const phoneInput = document.getElementById('waPhoneInput');
+  const copyBtn = document.getElementById('btnCopyPairingCode');
+
+  if (btnGetCode) {
+    btnGetCode.addEventListener('click', async () => {
+      const rawPhone = phoneInput ? phoneInput.value.trim() : '2347010299562';
+      const cleanPhone = rawPhone.replace(/\D/g, '');
+      if (!cleanPhone || cleanPhone.length < 9) {
+        alert('Please enter a valid WhatsApp phone number with country code (e.g. 2347010299562).');
+        return;
+      }
+
+      btnGetCode.disabled = true;
+      btnGetCode.textContent = 'REQUESTING...';
+
+      try {
+        const res = await fetch('http://localhost:3001/api/pairing-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: cleanPhone })
+        });
+
+        const data = await res.json();
+        if (data.code) {
+          currentActiveCode = data.code;
+          displayPairingCode(data.code);
+        } else if (data.status === 'connected') {
+          showConnectedState(data.phone || cleanPhone);
+        } else {
+          alert(data.error || 'Could not generate code. Make sure bot is active on port 3001.');
+        }
+      } catch (err) {
+        alert('Error contacting bot daemon at localhost:3001.');
+      } finally {
+        btnGetCode.disabled = false;
+        btnGetCode.textContent = 'GENERATE CODE';
+      }
+    });
+  }
+
+  // Copy Code
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      if (!currentActiveCode) return;
+      navigator.clipboard.writeText(currentActiveCode).then(() => {
+        copyBtn.textContent = 'COPIED ✓';
+        setTimeout(() => { copyBtn.textContent = 'COPY'; }, 2000);
+      });
+    });
+  }
+
+  // Refresh QR
+  const refreshQrBtn = document.getElementById('btnRefreshQr');
+  if (refreshQrBtn) {
+    refreshQrBtn.addEventListener('click', fetchLiveQr);
+  }
+
+  // Reset Session
+  const resetBtn = document.getElementById('btnResetWaSession');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      if (!confirm('Reset WhatsApp session and start fresh connection socket?')) return;
+      resetBtn.textContent = 'RESETTING...';
+      try {
+        await fetch('http://localhost:3001/api/reset', { method: 'POST' });
+        const codeBox = document.getElementById('pairingCodeDisplayBox');
+        if (codeBox) codeBox.style.display = 'none';
+        currentActiveCode = null;
+        setTimeout(pollWhatsAppModalStatus, 1500);
+      } catch (e) {
+        alert('Could not trigger session reset on port 3001.');
+      } finally {
+        setTimeout(() => { resetBtn.textContent = 'RESET'; }, 2000);
+      }
+    });
+  }
+}
+
+function displayPairingCode(rawCode) {
+  const codeBox = document.getElementById('pairingCodeDisplayBox');
+  const codeText = document.getElementById('pairingCodeText');
+  if (!codeBox || !codeText) return;
+
+  currentActiveCode = rawCode;
+  let formatted = rawCode;
+  if (rawCode.length === 8) {
+    formatted = `${rawCode.slice(0, 4)} - ${rawCode.slice(4)}`;
+  }
+  codeText.textContent = formatted;
+  codeBox.style.display = 'flex';
+}
+
+async function fetchLiveQr() {
+  const qrImg = document.getElementById('waQrImage');
+  const qrLoader = document.getElementById('qrLoader');
+  const qrLoaderText = document.getElementById('qrLoaderText');
+  const timerLabel = document.getElementById('qrTimerLabel');
+
+  try {
+    const res = await fetch('http://localhost:3001/api/qr');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (data.status === 'connected') {
+      showConnectedState(data.phone);
+    } else if (data.status === 'ready' && data.qr) {
+      if (qrImg && qrLoader) {
+        qrImg.src = data.qr;
+        qrImg.style.display = 'block';
+        qrLoader.style.display = 'none';
+      }
+      if (timerLabel) timerLabel.textContent = 'Live QR active';
+    } else {
+      if (qrImg && qrLoader) {
+        qrImg.style.display = 'none';
+        qrLoader.style.display = 'flex';
+        if (qrLoaderText) qrLoaderText.textContent = 'Waiting for QR generation...';
+      }
+    }
+  } catch (err) {
+    if (qrLoaderText) qrLoaderText.textContent = 'Bot daemon offline on port 3001.';
+  }
+}
+
+async function pollWhatsAppModalStatus() {
+  const statusLabel = document.getElementById('botStatusModalText');
+  const statusPhone = document.getElementById('botConnectedPhone');
+  const statusDot = document.getElementById('waStatusDot');
+
+  try {
+    const res = await fetch('http://localhost:3001/health');
+    if (!res.ok) throw new Error('Daemon unreachable');
+    const data = await res.json();
+
+    if (data.status === 'connected') {
+      showConnectedState(data.connectedPhone);
+    } else {
+      if (statusDot) {
+        statusDot.className = 'terminal-dot dot-waiting';
+      }
+      if (statusLabel) statusLabel.textContent = 'DAEMON ACTIVE — READY TO PAIR';
+      if (statusPhone) statusPhone.textContent = '';
+
+      if (data.pairingCode && !currentActiveCode) {
+        displayPairingCode(data.pairingCode);
+      }
+
+      const tabQr = document.getElementById('tabBtnQr');
+      if (tabQr && tabQr.classList.contains('active')) {
+        fetchLiveQr();
+      }
+    }
+  } catch (e) {
+    if (statusDot) statusDot.className = 'terminal-dot dot-offline';
+    if (statusLabel) statusLabel.textContent = 'DAEMON OFFLINE — PORT 3001';
+    if (statusPhone) statusPhone.textContent = '';
+  }
+}
+
+function showConnectedState(phone) {
+  const statusLabel = document.getElementById('botStatusModalText');
+  const statusPhone = document.getElementById('botConnectedPhone');
+  const statusDot = document.getElementById('waStatusDot');
+  const codeBox = document.getElementById('pairingCodeDisplayBox');
+  const qrImg = document.getElementById('waQrImage');
+  const qrLoader = document.getElementById('qrLoader');
+  const qrLoaderText = document.getElementById('qrLoaderText');
+
+  if (statusDot) statusDot.className = 'terminal-dot';
+  if (statusLabel) statusLabel.textContent = 'CONNECTED ✓';
+  if (statusPhone) statusPhone.textContent = phone ? `(+${phone})` : '';
+
+  if (codeBox) {
+    codeBox.style.display = 'flex';
+    document.getElementById('pairingCodeText').textContent = 'CONNECTED';
+    document.getElementById('pairingCodeNote').textContent = 'Device successfully paired to MechMind AI!';
+  }
+
+  if (qrImg && qrLoader) {
+    qrImg.style.display = 'none';
+    qrLoader.style.display = 'flex';
+    if (qrLoaderText) qrLoaderText.textContent = 'Device is already connected.';
+  }
 }

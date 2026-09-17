@@ -288,35 +288,85 @@
 
   </main>
 
-  <!-- WhatsApp Link / Terminal QR Modal -->
+  <!-- WhatsApp Link / Pairing & QR Modal -->
   <div class="modal-shell" id="qrModal">
     <div class="modal-window">
       <div class="modal-top">
         <div class="modal-title-wrap">
           <span class="panel-mark">■</span>
-          <h3>WHATSAPP BOT TERMINAL PAIRING</h3>
+          <h3>WHATSAPP FIELD AGENT LINKING</h3>
         </div>
         <button class="btn-close" id="closeQrModalBtn" aria-label="Close modal">&times;</button>
       </div>
+
       <div class="modal-content">
-        <p class="modal-desc">To start the WhatsApp bot and display the live pairing QR code in your terminal, run:</p>
-        
-        <div class="command-block">
-          <div class="command-header">
-            <span>POWERSHELL / TERMINAL</span>
-            <button class="btn-copy-cmd" id="copyCmdBtn" onclick="navigator.clipboard.writeText('cd mechmind-ai/whatsapp-bot; npm start'); this.textContent='COPIED'; setTimeout(()=>this.textContent='COPY', 2000)">COPY</button>
+        <!-- Live Connection Status Strip -->
+        <div class="pairing-status-box" id="waConnectionStrip">
+          <div class="terminal-dot" id="waStatusDot"></div>
+          <div class="wa-status-text-wrap">
+            <span class="wa-status-label" id="botStatusModalText">Checking daemon on port 3001...</span>
+            <span class="wa-status-phone" id="botConnectedPhone"></span>
           </div>
-          <code>cd mechmind-ai/whatsapp-bot; npm start</code>
+          <button class="btn-subtle-reset" id="btnResetWaSession" title="Clear session & restart bot if stuck">RESET</button>
         </div>
 
-        <div class="pairing-status-box">
-          <div class="terminal-dot"></div>
-          <p id="botStatusModalText">Checking WhatsApp Bot daemon on localhost:3001...</p>
+        <!-- Mode Selector Tabs -->
+        <div class="wa-tab-bar">
+          <button class="wa-tab active" id="tabBtnPairing" data-tab="pairing">8-DIGIT PAIRING CODE</button>
+          <button class="wa-tab" id="tabBtnQr" data-tab="qr">SCAN QR CODE</button>
+        </div>
+
+        <!-- Tab 1: 8-Digit Pairing Code (Recommended) -->
+        <div class="wa-tab-content active" id="tabContentPairing">
+          <p class="modal-desc">Link directly without camera. Enter your WhatsApp phone number to generate an 8-character verification code:</p>
+          
+          <div class="phone-input-bar">
+            <span class="phone-plus">+</span>
+            <input type="tel" id="waPhoneInput" value="2347010299562" placeholder="e.g. 2347010299562" autocomplete="tel">
+            <button class="btn-request-code" id="btnGetPairingCode">GENERATE CODE</button>
+          </div>
+
+          <!-- Code Display Container -->
+          <div class="pairing-code-box" id="pairingCodeDisplayBox" style="display: none;">
+            <div class="code-header">
+              <span>ENTER CODE IN WHATSAPP:</span>
+              <button class="btn-copy-code" id="btnCopyPairingCode">COPY</button>
+            </div>
+            <div class="pairing-code-number" id="pairingCodeText">--------</div>
+            <div class="code-timer-note" id="pairingCodeNote">Code active. Valid for ~2 minutes.</div>
+          </div>
+
+          <div class="instructions-steps">
+            <div class="step-item"><span class="step-num">1</span><span>Open <strong>WhatsApp</strong> on your phone</span></div>
+            <div class="step-item"><span class="step-num">2</span><span>Tap <strong>Settings</strong> (or Menu <strong>⋮</strong>) → <strong>Linked Devices</strong></span></div>
+            <div class="step-item"><span class="step-num">3</span><span>Tap <strong>Link a Device</strong></span></div>
+            <div class="step-item"><span class="step-num">4</span><span>Tap <strong>"Link with phone number instead"</strong> at bottom</span></div>
+            <div class="step-item"><span class="step-num">5</span><span>Type the 8-character code shown above</span></div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Scan QR Code -->
+        <div class="wa-tab-content" id="tabContentQr" style="display: none;">
+          <p class="modal-desc">Scan with WhatsApp camera (WhatsApp → Linked Devices → Link a Device):</p>
+          
+          <div class="qr-display-container">
+            <div class="qr-frame" id="qrFrame">
+              <img id="waQrImage" src="" alt="WhatsApp Web QR Code" style="display: none;">
+              <div class="qr-loader" id="qrLoader">
+                <div class="loader-spinner"></div>
+                <span id="qrLoaderText">Fetching live QR code...</span>
+              </div>
+            </div>
+            <div class="qr-actions">
+              <button class="btn-refresh-qr" id="btnRefreshQr">REFRESH QR</button>
+              <span class="qr-timer-label" id="qrTimerLabel">Auto-sync active</span>
+            </div>
+          </div>
         </div>
 
         <div class="modal-footer-notes">
-          <span>Configured Number: <strong>+234 7010299562</strong></span>
-          <span>Backend Target: <strong>localhost:8080</strong></span>
+          <span>WhatsApp Bot: <strong>localhost:3001</strong></span>
+          <span>FastAPI Engine: <strong>localhost:8080</strong></span>
         </div>
       </div>
     </div>

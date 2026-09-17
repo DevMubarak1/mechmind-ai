@@ -3,30 +3,56 @@
  * Uses Baileys (open-source WhatsApp Web API) + Express for internal API
  */
 
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const express = require('express');
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
-const qrcode = require('qrcode-terminal');
+const qrcodeTerminal = require('qrcode-terminal');
+const QRCode = require('qrcode');
 
 // Config
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
 const BOT_PORT = process.env.BOT_PORT || 3001;
 const AUTH_DIR = path.join(__dirname, 'auth_info');
-const ALERT_RECIPIENTS = (process.env.ALERT_RECIPIENTS || '').split(',').filter(Boolean);
+const ALERT_RECIPIENTS = (process.env.ALERT_RECIPIENTS || '2347010299562').split(',').filter(Boolean);
 
-// Express app for internal API (receives alerts from backend)
+// Express app for internal API (receives alerts & serves dashboard QR/pairing)
 const apiApp = express();
 apiApp.use(express.json());
 
+// Enable CORS for dashboard access from port 8080
+apiApp.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    next();
+});
+
 let sock = null;
+let latestQR = null;
+let latestPairingCode = null;
 
 // ========================
 // WhatsApp Connection
 // ========================
+
+function clearAuthFolder() {
+    try {
+        if (fs.existsSync(AUTH_DIR)) {
+            const files = fs.readdirSync(AUTH_DIR);
+            for (const f of files) {
+                fs.unlinkSync(path.join(AUTH_DIR, f));
+            }
+            console.log('[MECHMIND BOT] Auth folder wiped clean.');
+        }
+    } catch (e) {
+        console.error('Error clearing auth folder:', e.message);
+    }
+}
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
@@ -34,8 +60,11 @@ async function startBot() {
     sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
-        logger: pino({ level: 'warn' }),
-        browser: ['MechMind AI', 'Bot', '1.0.0'],
+        logger: pino({ level: 'silent' }),
+        browser: Browsers.ubuntu('Chrome'),
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 60000,
+        keepAliveIntervalMs: 25000,
     });
 
     // Handle connection updates
@@ -43,28 +72,34 @@ async function startBot() {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            console.log('\n╔══════════════════════════════════════╗');
-            console.log('║     MECHMIND AI - WhatsApp Bot       ║');
-            console.log('║                                      ║');
-            console.log('║  Scan QR code with your phone:       ║');
-            console.log('║  WhatsApp > Settings > Linked Devices ║');
-            console.log('╚══════════════════════════════════════╝\n');
-            qrcode.generate(qr, { small: true });
+            latestQR = qr;
+            console.log('\n[MECHMIND BOT] New WhatsApp QR Code generated.');
+            console.log('Access web QR at: http://localhost:3001/api/qr');
+            console.log('Or scan below in terminal:\n');
+            qrcodeTerminal.generate(qr, { small: true });
         }
 
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-            console.log(`Connection closed. Status: ${statusCode}. Reconnecting: ${shouldReconnect}`);
-            if (shouldReconnect) {
+            console.log(`[MECHMIND BOT] Connection closed. Status: ${statusCode}`);
+            latestQR = null;
+            latestPairingCode = null;
+
+            if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+                console.log('[MECHMIND BOT] Session invalid / Logged out. Resetting auth_info and restarting cleanly in 3s...');
+                clearAuthFolder();
                 setTimeout(startBot, 3000);
             } else {
-                console.log('Logged out. Delete auth_info folder and restart to re-scan QR.');
+                console.log('[MECHMIND BOT] Reconnecting in 4s...');
+                setTimeout(startBot, 4000);
             }
         }
 
         if (connection === 'open') {
-            console.log('\n✅ MechMind AI Bot connected to WhatsApp!\n');
+            latestQR = null;
+            latestPairingCode = null;
+            const connectedNum = sock?.user?.id ? sock.user.id.split(':')[0] : 'Linked';
+            console.log(`\n[MECHMIND BOT] Successfully connected to WhatsApp! User: +${connectedNum}\n`);
         }
     });
 
@@ -82,7 +117,7 @@ async function startBot() {
             const sender = msg.key.remoteJid;
             const isGroup = sender.endsWith('@g.us');
             
-            // Skip group messages for now
+            // Skip group messages
             if (isGroup) continue;
 
             await handleMessage(msg, sender);
@@ -96,16 +131,13 @@ async function startBot() {
 
 async function handleMessage(msg, sender) {
     const phoneNumber = sender.replace('@s.whatsapp.net', '');
-    console.log(`📩 Message from ${phoneNumber}`);
+    console.log(`[MSG] Incoming message from ${phoneNumber}`);
 
     try {
-        // Determine message type
         const msgContent = msg.message;
         
         if (msgContent.conversation || msgContent.extendedTextMessage) {
-            // Text message
             const text = msgContent.conversation || msgContent.extendedTextMessage?.text || '';
-            console.log(`   Text: ${text.substring(0, 100)}`);
             
             if (text.toLowerCase() === '/help' || text.toLowerCase() === 'help') {
                 await sendHelp(sender);
@@ -118,170 +150,155 @@ async function handleMessage(msg, sender) {
             }
 
             await handleTextQuery(sender, phoneNumber, text);
-
         } else if (msgContent.audioMessage) {
-            // Voice note
-            console.log('   Type: Voice note');
-            await handleVoiceNote(msg, sender, phoneNumber);
-
+            console.log('   Audio message received');
+            await handleAudioMessage(msg, sender, phoneNumber);
         } else if (msgContent.imageMessage) {
-            // Photo
-            console.log('   Type: Image');
-            await handleImage(msg, sender, phoneNumber);
-
-        } else {
-            await sendMessage(sender, '🤖 I can help with:\n• *Text* — Describe a problem\n• *Voice note* — Speak your question\n• *Photo* — Show me the issue\n\nType */help* for more options.');
+            console.log('   Image message received');
+            await handleImageMessage(msg, sender, phoneNumber);
         }
-    } catch (error) {
-        console.error('Error handling message:', error);
-        await sendMessage(sender, '❌ Sorry, something went wrong. Please try again.');
+    } catch (err) {
+        console.error('Error handling message:', err);
+        await sendMessage(sender, 'Sorry, an error occurred processing your request. Please try again.');
     }
 }
 
+// Handle text diagnostic queries
 async function handleTextQuery(sender, phoneNumber, text) {
-    await sendMessage(sender, '🔍 Analyzing your question...');
+    await sendMessage(sender, 'Thinking... Analyzing with MechMind AI...');
 
     try {
-        const response = await axios.post(`${BACKEND_URL}/api/diagnose`, {
+        const res = await axios.post(`${BACKEND_URL}/api/diagnose`, {
             phone_number: phoneNumber,
             message: text,
-            equipment_id: null
-        }, { timeout: 60000 }); // 60s timeout for Ollama
-
-        await sendMessage(sender, response.data.response);
-    } catch (error) {
-        console.error('Backend error:', error.message);
-        await sendMessage(sender, '⚠️ AI engine is loading. Please wait 30 seconds and try again.');
-    }
-}
-
-async function handleVoiceNote(msg, sender, phoneNumber) {
-    await sendMessage(sender, '🎤 Transcribing your voice note...');
-
-    try {
-        // Download voice note
-        const buffer = await downloadMediaMessage(msg, 'buffer', {});
-        
-        // Send to backend for transcription
-        const form = new FormData();
-        form.append('audio', buffer, { filename: 'voice.ogg', contentType: 'audio/ogg' });
-
-        const transcribeRes = await axios.post(`${BACKEND_URL}/api/transcribe`, form, {
-            headers: form.getHeaders(),
-            timeout: 30000
+            equipment_id: 1 // Default to equipment 1, or parse from message
         });
 
-        const transcript = transcribeRes.data.transcript;
-        await sendMessage(sender, `📝 I heard: _"${transcript}"_\n\n🔍 Getting diagnosis...`);
-
-        // Now diagnose the transcript
-        const diagRes = await axios.post(`${BACKEND_URL}/api/diagnose`, {
-            phone_number: phoneNumber,
-            message: transcript,
-            equipment_id: null
-        }, { timeout: 60000 });
-
-        await sendMessage(sender, diagRes.data.response);
-
-    } catch (error) {
-        console.error('Voice processing error:', error.message);
-        await sendMessage(sender, '⚠️ Could not process voice note. Try sending a text message instead.');
+        const response = res.data.response || 'No diagnosis available.';
+        await sendMessage(sender, `*MechMind AI Diagnosis:*\n\n${response}`);
+    } catch (err) {
+        console.error('Backend API error:', err.message);
+        await sendMessage(sender, 'Could not connect to the diagnostic engine. Is the backend running?');
     }
 }
 
-async function handleImage(msg, sender, phoneNumber) {
-    const caption = msg.message.imageMessage.caption || 'What issue do you see in this image?';
-    await sendMessage(sender, '📸 Analyzing your photo...');
+// Handle voice notes
+async function handleAudioMessage(msg, sender, phoneNumber) {
+    await sendMessage(sender, 'Transcribing your voice note...');
 
     try {
-        // Download image
         const buffer = await downloadMediaMessage(msg, 'buffer', {});
-        
-        // For now, describe the image context and use text diagnosis
-        // (Vision analysis requires Gemini API - added as fallback)
-        const diagRes = await axios.post(`${BACKEND_URL}/api/diagnose`, {
-            phone_number: phoneNumber,
-            message: `[User sent a photo of equipment with caption: "${caption}". Based on the description, provide diagnostic guidance.]`,
-            equipment_id: null
-        }, { timeout: 60000 });
+        const tempPath = path.join(__dirname, `temp_audio_${Date.now()}.ogg`);
+        fs.writeFileSync(tempPath, buffer);
 
-        await sendMessage(sender, diagRes.data.response);
+        const formData = new FormData();
+        formData.append('file', fs.createReadStream(tempPath));
+        formData.append('phone_number', phoneNumber);
 
-    } catch (error) {
-        console.error('Image processing error:', error.message);
-        await sendMessage(sender, '⚠️ Could not analyze photo. Please describe the issue in text.');
+        const res = await axios.post(`${BACKEND_URL}/api/diagnose/voice`, formData, {
+            headers: formData.getHeaders(),
+            timeout: 60000
+        });
+
+        // Cleanup
+        try { fs.unlinkSync(tempPath); } catch (e) {}
+
+        const { transcription, response } = res.data;
+        await sendMessage(sender, `*Transcribed:* "${transcription}"\n\n*MechMind AI Diagnosis:*\n\n${response}`);
+    } catch (err) {
+        console.error('Voice processing error:', err.message);
+        await sendMessage(sender, 'Could not process audio. Please send a text message instead.');
     }
 }
 
-// ========================
-// Helper Functions
-// ========================
+// Handle images
+async function handleImageMessage(msg, sender, phoneNumber) {
+    await sendMessage(sender, 'Analyzing your image...');
 
+    try {
+        const buffer = await downloadMediaMessage(msg, 'buffer', {});
+        const caption = msg.message.imageMessage.caption || 'Equipment inspection';
+        const tempPath = path.join(__dirname, `temp_img_${Date.now()}.jpg`);
+        fs.writeFileSync(tempPath, buffer);
+
+        const formData = new FormData();
+        formData.append('file', fs.createReadStream(tempPath));
+        formData.append('phone_number', phoneNumber);
+        formData.append('caption', caption);
+
+        const res = await axios.post(`${BACKEND_URL}/api/diagnose/image`, formData, {
+            headers: formData.getHeaders(),
+            timeout: 60000
+        });
+
+        try { fs.unlinkSync(tempPath); } catch (e) {}
+
+        const response = res.data.response || 'Image analyzed.';
+        await sendMessage(sender, `*Visual Inspection Analysis:*\n\n${response}`);
+    } catch (err) {
+        console.error('Image processing error:', err.message);
+        await sendMessage(sender, 'Could not process image. Please try again.');
+    }
+}
+
+// Help command
+async function sendHelp(sender) {
+    const helpText = `*MechMind AI - Field Assistant*
+
+Send me any of the following:
+• *Text*: Describe symptoms (e.g., "hydraulic pump overheating at 90C")
+• *Voice Note*: Speak naturally in English, Pidgin, or Hausa
+• *Photo*: Send a picture of the damaged component or gauge
+• */status*: Check current machinery status
+• */help*: Show this help menu
+
+*Tip*: Include equipment name (CAT 320, XCMG loader, etc.) for better diagnosis.`;
+
+    await sendMessage(sender, helpText);
+}
+
+// Status command
+async function sendStatus(sender) {
+    try {
+        const res = await axios.get(`${BACKEND_URL}/api/equipment`);
+        const equipment = res.data;
+
+        let statusText = '*MechMind Fleet Status*\n\n';
+        for (const eq of equipment) {
+            statusText += `*${eq.name}* (${eq.type})\n`;
+            statusText += `  Status: ${eq.status.toUpperCase()}\n`;
+            statusText += `  Location: ${eq.location || 'Site A'}\n\n`;
+        }
+
+        await sendMessage(sender, statusText);
+    } catch (err) {
+        await sendMessage(sender, 'Could not fetch equipment status from backend.');
+    }
+}
+
+// Helper: send text message
 async function sendMessage(jid, text) {
     if (!sock) return;
     await sock.sendMessage(jid, { text });
 }
 
-async function sendHelp(sender) {
-    const helpText = `🤖 *MechMind AI — Equipment Diagnostic Bot*
-
-I help field mechanics diagnose construction equipment problems using AI.
-
-*Commands:*
-📝 Just type your question — _"My excavator engine is overheating"_
-🎤 Send a voice note — describe the problem by speaking
-📸 Send a photo — show me the faulty part
-/status — Check equipment sensor status
-/help — Show this help message
-
-*Example questions:*
-• _"Hydraulic pump making grinding noise"_
-• _"What causes high vibration in a wheel loader?"_
-• _"Engine temperature keeps rising above 100°C"_
-• _"Oil leak near the boom cylinder"_
-
-💡 The more detail you give, the better my diagnosis.`;
-
-    await sendMessage(sender, helpText);
-}
-
-async function sendStatus(sender) {
-    try {
-        const res = await axios.get(`${BACKEND_URL}/api/dashboard/stats`, { timeout: 5000 });
-        const stats = res.data;
-
-        const statusText = `📊 *MechMind System Status*
-
-🏗️ Equipment monitored: ${stats.equipment_count}
-📡 Readings today: ${stats.readings_today}
-⚠️ Active alerts: ${stats.active_alerts}
-🔍 Diagnostics today: ${stats.diagnostics_today}
-
-_System is running normally._`;
-
-        await sendMessage(sender, statusText);
-    } catch (error) {
-        await sendMessage(sender, '⚠️ Could not fetch system status. Backend may be offline.');
-    }
-}
-
 // ========================
-// Internal API (for backend to send alerts)
+// Express API Endpoints
 // ========================
 
+// Send alert to configured WhatsApp recipients
 apiApp.post('/api/send-alert', async (req, res) => {
     const { message, node_id } = req.body;
 
-    if (!sock) {
+    if (!sock || !sock.user) {
         return res.status(503).json({ error: 'WhatsApp not connected' });
     }
 
-    // Send alert to all recipients
     let sent = 0;
     for (const recipient of ALERT_RECIPIENTS) {
         try {
             const jid = `${recipient.replace(/\D/g, '')}@s.whatsapp.net`;
-            await sendMessage(jid, `🚨 *ALERT from ${node_id}*\n\n${message}`);
+            await sendMessage(jid, `*ALERT from ${node_id}*\n\n${message}`);
             sent++;
         } catch (e) {
             console.error(`Failed to send alert to ${recipient}:`, e.message);
@@ -291,8 +308,97 @@ apiApp.post('/api/send-alert', async (req, res) => {
     res.json({ sent, total: ALERT_RECIPIENTS.length });
 });
 
+// Provide QR Code image to dashboard
+apiApp.get('/api/qr', async (req, res) => {
+    const isConnected = !!(sock && sock.user);
+    if (isConnected) {
+        const phone = sock.user?.id ? sock.user.id.split(':')[0] : 'Linked';
+        return res.json({ status: 'connected', qr: null, phone });
+    }
+
+    if (!latestQR) {
+        return res.json({ 
+            status: 'waiting', 
+            qr: null, 
+            pairingCode: latestPairingCode 
+        });
+    }
+
+    try {
+        const dataUrl = await QRCode.toDataURL(latestQR, {
+            width: 220,
+            margin: 2,
+            color: {
+                dark: '#09090b',
+                light: '#ffffff'
+            }
+        });
+        res.json({ 
+            status: 'ready', 
+            qr: dataUrl, 
+            raw: latestQR,
+            pairingCode: latestPairingCode
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Request 8-Character Pairing Code (Alternative to QR Code)
+apiApp.post('/api/pairing-code', async (req, res) => {
+    const rawPhone = req.body.phone || '2347010299562';
+    const phone = rawPhone.replace(/\D/g, '');
+
+    if (sock && sock.user) {
+        const userPhone = sock.user?.id ? sock.user.id.split(':')[0] : phone;
+        return res.json({ status: 'connected', code: null, message: `Already connected to WhatsApp (+${userPhone}).` });
+    }
+
+    if (!sock) {
+        return res.status(503).json({ error: 'WhatsApp socket not initialized' });
+    }
+
+    try {
+        console.log(`[MECHMIND BOT] Requesting 8-digit pairing code for: +${phone}`);
+        const code = await sock.requestPairingCode(phone);
+        latestPairingCode = code;
+        console.log(`[MECHMIND BOT] >>> PAIRING CODE: ${code} <<<`);
+        res.json({ status: 'pairing_code', code, phone: `+${phone}` });
+    } catch (err) {
+        console.error('[MECHMIND BOT] Error requesting pairing code:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Reset session & clear auth folder
+apiApp.post('/api/reset', async (req, res) => {
+    try {
+        console.log('[MECHMIND BOT] Session reset requested from dashboard.');
+        latestQR = null;
+        latestPairingCode = null;
+        if (sock) {
+            try { sock.end(undefined); } catch (e) {}
+            sock = null;
+        }
+        clearAuthFolder();
+        setTimeout(startBot, 1000);
+        res.json({ status: 'resetting', message: 'Auth info cleared and bot restarting clean session.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Health check endpoint
 apiApp.get('/health', (req, res) => {
-    res.json({ status: sock ? 'connected' : 'disconnected' });
+    const isConnected = !!(sock && sock.user);
+    const phone = isConnected ? (sock.user?.id ? sock.user.id.split(':')[0] : null) : null;
+    res.json({
+        status: isConnected ? 'connected' : 'disconnected',
+        hasQR: !!latestQR,
+        hasPairingCode: !!latestPairingCode,
+        pairingCode: latestPairingCode,
+        connectedPhone: phone
+    });
 });
 
 // ========================
@@ -300,7 +406,7 @@ apiApp.get('/health', (req, res) => {
 // ========================
 
 apiApp.listen(BOT_PORT, () => {
-    console.log(`📡 Alert API listening on port ${BOT_PORT}`);
+    console.log(`[MECHMIND BOT] Alert API & QR Server listening on port ${BOT_PORT}`);
 });
 
 startBot().catch(console.error);
