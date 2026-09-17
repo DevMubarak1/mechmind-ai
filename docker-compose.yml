@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mechmind-db
+    environment:
+      POSTGRES_USER: mechmind
+      POSTGRES_PASSWORD: mechmind2026
+      POSTGRES_DB: mechmind_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: mechmind-vectordb
+    ports:
+      - "8100:8000"
+    volumes:
+      - chromadata:/chroma/chroma
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  chromadata:

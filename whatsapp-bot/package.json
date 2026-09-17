@@ -1,0 +1,19 @@
+{
+  "name": "mechmind-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "MechMind AI WhatsApp Bot using Baileys",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.0",
+    "qrcode-terminal": "^0.12.0",
+    "pino": "^9.0.0",
+    "express": "^4.19.0",
+    "axios": "^1.7.0",
+    "form-data": "^4.0.0",
+    "mime-types": "^2.1.35"
+  }
+}

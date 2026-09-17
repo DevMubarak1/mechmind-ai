@@ -1,0 +1,10 @@
+node_modules/
+auth_info/
+__pycache__/
+*.pyc
+.env
+*.ogg
+*.wav
+.venv/
+chroma_data/
+pgdata/
