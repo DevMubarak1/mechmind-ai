@@ -78,7 +78,11 @@ void setupI2S() {
     .sample_rate = 16000,
     .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
     .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-    .communication_format = i2s_comm_format_t(I2S_COMM_FORMAT_STAND_I2S),
+#if defined(I2S_COMM_FORMAT_STAND_I2S)
+    .communication_format = (i2s_comm_format_t)(I2S_COMM_FORMAT_STAND_I2S),
+#else
+    .communication_format = (i2s_comm_format_t)(I2S_COMM_FORMAT_I2S),
+#endif
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
     .dma_buf_count = 4,
     .dma_buf_len = I2S_BUFFER_LEN,
@@ -96,7 +100,6 @@ void setupI2S() {
 
   i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
   i2s_set_pin(I2S_PORT, &pin_config);
-  i2s_set_clk(I2S_PORT, 16000, I2S_BITS_PER_SAMPLE_32BIT, I2S_CHANNEL_MONO);
 }
 
 // ========================
@@ -106,7 +109,8 @@ float readSoundLevelDb() {
   int32_t samples[I2S_BUFFER_LEN];
   size_t bytesRead = 0;
   
-  esp_err_t result = i2s_read(I2S_PORT, (char*)samples, sizeof(samples), &bytesRead, portMAX_DELAY);
+  // 100ms timeout prevents freezing if microphone is disconnected or unclocked
+  esp_err_t result = i2s_read(I2S_PORT, (char*)samples, sizeof(samples), &bytesRead, pdMS_TO_TICKS(100));
   if (result != ESP_OK || bytesRead == 0) {
     return 45.0; // Ambient fallback
   }
@@ -190,10 +194,12 @@ void setup() {
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   int retries = 0;
+  bool ledState = false;
   while (WiFi.status() != WL_CONNECTED && retries < 30) {
     delay(500);
     Serial.print(".");
-    digitalWrite(STATUS_LED_PIN, !digitalRead(STATUS_LED_PIN)); // Blink while connecting
+    ledState = !ledState;
+    digitalWrite(STATUS_LED_PIN, ledState ? HIGH : LOW);
     retries++;
   }
 
@@ -263,8 +269,12 @@ void loop() {
     }
     http.end();
   } else {
-    // Auto-reconnect
-    Serial.println("[*] WiFi lost. Reconnecting...");
-    WiFi.reconnect();
+    // Throttled auto-reconnect (check every 10 seconds)
+    static unsigned long lastReconnectTime = 0;
+    if (now - lastReconnectTime > 10000) {
+      lastReconnectTime = now;
+      Serial.println("[*] WiFi lost. Attempting reconnection...");
+      WiFi.reconnect();
+    }
   }
 }

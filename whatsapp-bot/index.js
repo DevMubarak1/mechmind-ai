@@ -115,10 +115,13 @@ async function startBot() {
             if (!msg.message) continue;
 
             const sender = msg.key.remoteJid;
-            const isGroup = sender.endsWith('@g.us');
-            
-            // Skip group messages
-            if (isGroup) continue;
+            // Ignore WhatsApp Status/Stories, broadcasts, and group chats
+            if (!sender || sender === 'status@broadcast' || sender.endsWith('@broadcast') || sender.endsWith('@g.us')) {
+                continue;
+            }
+            if (!sender.endsWith('@s.whatsapp.net')) {
+                continue;
+            }
 
             await handleMessage(msg, sender);
         }

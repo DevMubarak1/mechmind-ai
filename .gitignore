@@ -8,3 +8,5 @@ __pycache__/
 .venv/
 chroma_data/
 pgdata/
+temp_*
+whatsapp-bot/temp_*
