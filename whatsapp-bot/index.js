@@ -214,26 +214,41 @@ async function handleMessage(msg, sender) {
     }
 }
 
+// Strip markdown formatting from bot response text before sending to WhatsApp
+function stripMarkdown(text) {
+    return text
+        .replace(/\*\*(.+?)\*\*/g, '$1')                         // **bold** -> plain
+        .replace(/\*([A-Z][^*\n]{0,40}:)\*/g, '$1')              // *HEADER:* -> HEADER:
+        .replace(/^\s*\*\s+/gm, '- ')                            // * bullet -> - bullet
+        .replace(/\*/g, '')                                       // remaining asterisks
+        .replace(/^#{1,4}\s+(.+)$/gm, (_, t) => t.toUpperCase()) // ## Header -> HEADER
+        .replace(/^[-_]{3,}\s*$/gm, '')                          // horizontal rules
+        .replace(/\n{3,}/g, '\n\n')                              // collapse blank lines
+        .trim();
+}
+
 // Handle text diagnostic queries
 async function handleTextQuery(sender, phoneNumber, text) {
     try {
-        // Send immediate interim acknowledgment to prevent user confusion during 8B CPU inference (p95 ~100s)
-        await sendMessage(sender, "*MechMind AI* is analyzing your query. Please wait.");
+        // Show typing indicator instead of sending an interim message
+        await sock.sendPresenceUpdate('composing', sender);
 
         const res = await axios.post(`${BACKEND_URL}/api/diagnose`, {
             phone_number: phoneNumber,
             message: text,
             equipment_id: 1
         }, {
-            timeout: 180000 // 180s timeout (comfortably exceeds p95 latency of 100.58s)
+            timeout: 180000 // 180s — p95 diagnostic latency is ~100s
         });
 
-        const response = res.data.response || 'No diagnosis available.';
+        await sock.sendPresenceUpdate('paused', sender);
+        const response = stripMarkdown(res.data.response || 'No diagnosis available.');
         await sendMessage(sender, response);
     } catch (err) {
+        await sock.sendPresenceUpdate('paused', sender);
         console.error('Backend API error:', err.message);
         if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-            await sendMessage(sender, '*Diagnostic Request Timed Out* - The diagnostic engine took longer than expected. Please retry your query.');
+            await sendMessage(sender, 'The diagnostic engine took longer than expected. Please retry your query.');
         } else {
             await sendMessage(sender, 'Could not connect to the diagnostic engine. Is the backend running on port 8080?');
         }
@@ -242,7 +257,7 @@ async function handleTextQuery(sender, phoneNumber, text) {
 
 // Handle voice notes
 async function handleAudioMessage(msg, sender, phoneNumber) {
-    await sendMessage(sender, '*MechMind AI* is transcribing your voice note. Please wait.');
+    await sock.sendPresenceUpdate('composing', sender);
 
     try {
         const buffer = await downloadMediaMessage(msg, 'buffer', {});
@@ -255,18 +270,20 @@ async function handleAudioMessage(msg, sender, phoneNumber) {
 
         const res = await axios.post(`${BACKEND_URL}/api/diagnose/voice`, formData, {
             headers: formData.getHeaders(),
-            timeout: 180000 // 180s timeout
+            timeout: 180000
         });
 
-        // Cleanup
         try { fs.unlinkSync(tempPath); } catch (e) {}
+        await sock.sendPresenceUpdate('paused', sender);
 
         const { transcription, response } = res.data;
-        await sendMessage(sender, `*Transcribed:* "${transcription}"\n\n*MechMind AI Diagnosis:*\n\n${response}`);
+        const cleanResponse = stripMarkdown(response || '');
+        await sendMessage(sender, `Transcribed: "${transcription}"\n\n${cleanResponse}`);
     } catch (err) {
+        await sock.sendPresenceUpdate('paused', sender);
         console.error('Voice processing error:', err.message);
         if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-            await sendMessage(sender, '*Voice Processing Timed Out* - Please send a text query instead.');
+            await sendMessage(sender, 'Voice transcription timed out. Please send a text message instead.');
         } else {
             await sendMessage(sender, 'Could not process audio. Please send a text message instead.');
         }
@@ -275,7 +292,7 @@ async function handleAudioMessage(msg, sender, phoneNumber) {
 
 // Handle images
 async function handleImageMessage(msg, sender, phoneNumber) {
-    await sendMessage(sender, '*MechMind AI* is analyzing your image. Please wait.');
+    await sock.sendPresenceUpdate('composing', sender);
 
     try {
         const buffer = await downloadMediaMessage(msg, 'buffer', {});
@@ -288,21 +305,24 @@ async function handleImageMessage(msg, sender, phoneNumber) {
         formData.append('phone_number', phoneNumber);
         formData.append('caption', caption);
 
+        // 60s timeout — if no vision model is available the endpoint returns quickly
         const res = await axios.post(`${BACKEND_URL}/api/diagnose/image`, formData, {
             headers: formData.getHeaders(),
-            timeout: 180000 // 180s timeout
+            timeout: 60000
         });
 
         try { fs.unlinkSync(tempPath); } catch (e) {}
+        await sock.sendPresenceUpdate('paused', sender);
 
-        const response = res.data.response || 'Image analyzed.';
-        await sendMessage(sender, `*Visual Inspection Analysis:*\n\n${response}`);
+        const response = stripMarkdown(res.data.response || 'Image received.');
+        await sendMessage(sender, response);
     } catch (err) {
+        await sock.sendPresenceUpdate('paused', sender);
         console.error('Image processing error:', err.message);
         if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-            await sendMessage(sender, '*Visual Inspection Timed Out* - Please retry with a smaller image.');
+            await sendMessage(sender, 'Image analysis timed out. Describe what you see in text — wear patterns, leaks, cracks, discoloration — and I can help diagnose from your description.');
         } else {
-            await sendMessage(sender, 'Could not process image. Please try again.');
+            await sendMessage(sender, 'Could not process the image. Send a text description of what you are seeing and I will help diagnose it.');
         }
     }
 }

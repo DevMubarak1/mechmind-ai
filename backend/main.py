@@ -425,35 +425,16 @@ async def diagnose_image(file: UploadFile = File(...), phone_number: str = Form(
             pass
 
     if not vision_response:
-        cap = user_caption.lower()
-        if any(w in cap for w in ["leak", "oil", "fluid", "hose"]):
-            vision_response = (
-                "*MechMind AI Visual Inspection Report: Hydraulic System*\n\n"
-                "*1. Visual Findings:*\n"
-                "- High-pressure hydraulic fitting weeping or damaged seal ring detected.\n"
-                "- Fluid discoloration indicates potential thermal oxidation of oil.\n\n"
-                "*2. Immediate Recommendation:*\n"
-                "- Depressurize hydraulic circuit before tightening fitting or replacing O-ring.\n"
-                "- Check reservoir level sight gauge immediately."
-            )
-        elif any(w in cap for w in ["crack", "metal", "weld", "boom", "arm"]):
-            vision_response = (
-                "*MechMind AI Visual Inspection Report: Structural Component*\n\n"
-                "*1. Visual Findings:*\n"
-                "- Structural stress fracture or weld fatigue line identified.\n"
-                "- High-stress concentration area on boom/arm bracket.\n\n"
-                "*2. Immediate Recommendation:*\n"
-                "- Cease heavy digging/lifting operations immediately to prevent structural tear.\n"
-                "- Perform dye penetrant inspection and gouge/reweld per OEM structural specs."
-            )
-        else:
-            vision_response = (
-                f"*MechMind AI Visual Inspection Report*\n\n"
-                f"*Observation:* Image received for {user_caption}.\n"
-                "- Component visually logged into maintenance record.\n"
-                "- Cross-referenced with active asset telemetry (ADXL345 vibration and temperature probes).\n\n"
-                "*Recommendation:* Inspect mounting fasteners, clean debris around cooling fins, and verify seal integrity."
-            )
+        # No vision model available -- be honest rather than fabricate findings
+        vision_response = (
+            "No vision model is currently loaded in Ollama, so I cannot analyze the image directly.\n\n"
+            "To get a diagnosis, describe what you see in text:\n"
+            "- Visible fluid leaks or discoloration\n"
+            "- Cracks, deformation, or structural damage\n"
+            "- Unusual wear patterns or missing components\n"
+            "- Any warning labels or gauge readings visible in the photo\n\n"
+            "Send that description and I will provide a full diagnostic assessment."
+        )
 
     vision_response = strip_emojis(vision_response or "Visual inspection complete.").strip()
 

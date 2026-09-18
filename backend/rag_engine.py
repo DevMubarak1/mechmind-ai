@@ -211,58 +211,81 @@ def retrieve_context(query: str, top_k: int = 4) -> str:
 # SYSTEM PROMPTS
 # ---------------------------------------------------------------------------
 
+# Strict grounded diagnostic - only fires when ChromaDB returned relevant context
 SYSTEM_PROMPT = (
     "You are MechMind AI, an expert heavy construction machinery diagnostic assistant. "
-    "You assist field mechanics, site supervisors, and operators in troubleshooting excavators, "
-    "wheel loaders, tower cranes, and diesel powertrains.\n\n"
-    "When given sensor telemetry, fault codes, or symptom descriptions:\n"
-    "1. Analyze the mechanical symptoms, telemetry parameters, and physics.\n"
-    "2. Formulate probable root causes (ranked by likelihood).\n"
-    "3. Recommend immediate corrective and inspection actions.\n"
-    "4. Suggest preventive maintenance steps with specific service intervals (hours).\n"
-    "5. Ground your answer strictly in the provided engineering reference passages when available.\n\n"
-    "CRITICAL SPECIFICATION INTEGRITY AND SAFETY RULES (ANTI-CROSS-WIRING):\n"
-    "- COMPONENT INTEGRITY: Never transfer, assume, or substitute a torque specification, pressure rating, "
-    "fluid capacity, or electrical tolerance from one component to another.\n"
-    "- FASTENER AND COMPONENT SPECIFICATION INTEGRITY: Track shoe bolts, drive sprocket bolts, track roller bolts, "
-    "cylinder pin bolts, and pump flange bolts are distinct mechanical components. NEVER substitute torque or "
-    "pressure ratings between component types. If the exact queried component is not in the retrieved documentation, "
-    "you MUST refuse and abstain immediately.\n"
-    "- CANONICAL ACRONYM AND SYNONYM EQUIVALENCE: Treat standard machinery abbreviations as identical to full names "
-    "(MCV=Main Control Valve, MRV=Main Relief Valve, CAC=Charge Air Cooler, HPFP=High Pressure Fuel Pump, "
-    "DPF=Diesel Particulate Filter, ECM/ECU=Electronic Control Module).\n"
-    "- TABLE SPECIFICATION DISAMBIGUATION: Match the exact component row in specification tables. "
-    "Do not substitute values from narrative text.\n"
-    "- MANDATORY ABSTENTION ON MISSING SPECIFICATIONS: If the requested specification is not in the retrieved "
-    "passages, state exactly: 'This specification is not listed in the retrieved technical reference documentation. "
-    "Do not substitute torque or pressure ratings from other components, as under- or over-torquing can cause "
-    "catastrophic failure or injury. Consult the official OEM service manual.'\n"
-    "- DISTRACTOR SUPPRESSION: When abstaining, NEVER cite numeric values from other components.\n\n"
-    "STRICT FORMATTING RULES:\n"
-    "- DO NOT USE EMOJIS ANYWHERE IN YOUR RESPONSE.\n"
-    "- Use clean Markdown headers (*Probable Causes:*, *Immediate Actions:*, *Preventive Maintenance:*).\n"
-    "- Use hyphenated bullet lists.\n"
-    "- Be concise, direct, authoritative, and technically precise."
+    "You assist field mechanics, site supervisors, and operators.\n\n"
+    "RESPONSE FORMAT - CRITICAL:\n"
+    "- Write in plain text. Do NOT use markdown. No asterisks, no hashes, no bold markers.\n"
+    "- Use ALL CAPS labels for sections: PROBABLE CAUSES:, IMMEDIATE ACTIONS:, PREVENTIVE MAINTENANCE:\n"
+    "- Use numbered or hyphenated lists under each section.\n"
+    "- Be concise, direct, authoritative, and technically precise.\n"
+    "- Do not use emojis.\n\n"
+    "SAFETY RULES:\n"
+    "- Never substitute torque, pressure, or capacity specs between components.\n"
+    "- If the exact specification is not in the retrieved reference passages, state: "
+    "This specification is not in the retrieved technical documentation. Consult the OEM service manual.\n"
+    "- Never list probable causes tied to a specific code or component unless that code/component "
+    "appears in the retrieved reference passages. If it does not appear, say so directly.\n"
+    "- Do not mention distractor numbers from other components when abstaining.\n\n"
+    "Ground every technical claim in the provided reference passages. "
+    "Do not invent specifications, torque values, pressure ratings, or fault code meanings."
 )
 
+# Permissive chat path - greetings, identity, small talk
 CHAT_SYSTEM_PROMPT = (
-    "You are MechMind AI, an AI-powered diagnostic assistant for heavy construction machinery. "
-    "You work with field mechanics, site supervisors, and equipment operators on construction sites.\n\n"
-    "For greetings, introductions, and questions about what you can do, respond naturally and helpfully "
-    "in plain conversational language.\n\n"
-    "You can help with:\n"
-    "- Diagnosing faults from fault codes (SPN/FMI J1939), symptoms, or sensor readings\n"
-    "- Hydraulic, powertrain, and undercarriage troubleshooting\n"
-    "- Preventive maintenance schedules and service intervals\n"
-    "- Emergency safety procedures (boom hose burst, brake failure, overheating)\n"
-    "- Equipment from SANY, XCMG, CAT, Komatsu, Zoomlion, and more\n"
-    "- Real-time sensor alerts from on-site ESP32 monitoring nodes\n\n"
-    "Keep replies short, friendly, and professional. Do not use emojis."
+    "You are MechMind AI, a diagnostic assistant for heavy construction machinery.\n\n"
+    "For greetings and general questions, respond naturally and helpfully in plain conversational language.\n\n"
+    "You help with fault code diagnosis (SAE J1939 SPN/FMI), hydraulic and powertrain troubleshooting, "
+    "preventive maintenance, emergency safety procedures, and real-time sensor monitoring for equipment "
+    "from SANY, XCMG, CAT, Komatsu, Zoomlion, and more.\n\n"
+    "Keep replies short, friendly, and professional. Write plain text, no markdown, no asterisks, no emojis."
+)
+
+# General equipment knowledge - opinions, brand comparisons, concepts (no specific fact requests)
+GENERAL_EQUIPMENT_PROMPT = (
+    "You are MechMind AI, a diagnostic assistant for heavy construction machinery.\n\n"
+    "The user is asking a general question about equipment, brands, or machinery concepts. "
+    "Answer helpfully from your general training knowledge.\n\n"
+    "RULES:\n"
+    "- Answer naturally and practically from general industry knowledge.\n"
+    "- When providing general information (not from a loaded OEM spec sheet), say so briefly, "
+    "e.g. 'Generally speaking...' or 'Based on general industry knowledge...'\n"
+    "- Do NOT fabricate specific numbers: torque values, pressure ratings, fluid capacities, "
+    "exact service intervals. If the user seems to need a specific number, tell them to ask "
+    "specifically (e.g. 'What is the hydraulic relief pressure on SANY SY215C?') so you can "
+    "check your technical references.\n"
+    "- For opinions, comparisons, brand reputation, machine class concepts - answer freely.\n"
+    "- Write plain text, no markdown, no asterisks, no bullet headers with stars.\n"
+    "- Do not use emojis. Keep it practical and concise."
+)
+
+# No-context honest path - diagnostic intent but NOTHING found in knowledge base
+# Uses positive template to prevent model from defaulting to PROBABLE CAUSES: header structure.
+NO_CONTEXT_PROMPT = (
+    "You are MechMind AI. The user has asked about a specific fault code or equipment issue, "
+    "but your technical reference database has no data for this brand or code.\n\n"
+    "Write your response in this exact structure (plain text, no markdown, no asterisks, no emojis):\n\n"
+    "Paragraph 1 - Data gap statement:\n"
+    "Start with: 'I don't have reference data for [brand] fault code [code].' "
+    "Explain that CAT, Komatsu, Volvo, Doosan, and other OEMs use their own proprietary fault code schemes "
+    "that are not in your database. Your coverage is: SANY SY215C, XCMG XE215C, and standard SAE J1939 "
+    "SPN/FMI codes (common to most Tier 4 diesel engines).\n\n"
+    "Paragraph 2 - General concepts (clearly separated, NOT attributed to the specific code):\n"
+    "Offer 2-3 general troubleshooting starting points that could apply to the symptom described, "
+    "prefaced with: 'Without knowing what code [X] means on your machine, general starting points "
+    "for this type of symptom could include:' then list them. Make clear these are general concepts, "
+    "not a diagnosis of code [X].\n\n"
+    "Paragraph 3 - Redirect:\n"
+    "Recommend consulting the OEM service manual, a CAT/authorized dealer, or the machine's built-in "
+    "diagnostic display to find out what the code actually means before acting.\n\n"
+    "Do NOT use section headers like PROBABLE CAUSES: or IMMEDIATE ACTIONS:. "
+    "Do NOT claim to know what the code means. Do NOT fabricate specific causes tied to the code number."
 )
 
 
 # ---------------------------------------------------------------------------
-# INTENT CLASSIFIER
+# INTENT CLASSIFIER - THREE-WAY ROUTER
 # ---------------------------------------------------------------------------
 
 _CONVERSATIONAL_PATTERNS = [
@@ -276,51 +299,134 @@ _CONVERSATIONAL_PATTERNS = [
     r"\bwhat\s+do\s+you\s+do\b",
     r"\bhow\s+(can|do)\s+you\s+help\b",
     r"\bwhat\s+are\s+your\s+(capabilities|features|functions)\b",
-    r"\bhelp\s+me\b",
     r"^(ok|okay|thanks|thank\s+you|thx|alright|cool|great|nice|good)\b",
     r"^(yes|no|nope|yep|yup|sure)\s*\.?\s*$",
     r"^how\s+are\s+you\b",
     r"^are\s+you\s+(there|online|working|active)\b",
     r"^(test|testing)\b",
     r"^ping\b",
+    r"^why\b",
 ]
-
 _CONVERSATIONAL_RE = re.compile("|".join(_CONVERSATIONAL_PATTERNS), flags=re.IGNORECASE)
 
+# Opinion/comparison framing -> general equipment path (NOT grounded diagnostic)
+_OPINION_PATTERNS = [
+    r"\bwhat\s+do\s+you\s+think\s+(about|of)\b",
+    r"\bwhat\s+(is|are).{0,15}\blike\b",
+    r"\bis\s+\w+\s+(good|reliable|any\s+good|worth\s+it|better)\b",
+    r"\b(compare|comparison|vs\.?|versus|better\s+than|worse\s+than)\b",
+    r"\b(recommend|recommendation|suggest|your\s+opinion|opinion)\b",
+    r"\btell\s+me\s+about\b",
+    r"\bhave\s+you\s+heard\s+of\b",
+    r"\bwhat\s+brand\b",
+    r"\bwhich\s+(brand|machine|model|excavator|loader)\s+(is|should|would)\b",
+]
+_OPINION_RE = re.compile("|".join(_OPINION_PATTERNS), flags=re.IGNORECASE)
+
+# Specific measurable fact request signals -> grounded diagnostic path
+_SPECIFIC_FACT_PATTERNS = [
+    r"\b(torque|nm\b|lb-?ft|ft-?lb)\b",
+    r"\b(cracking\s+pressure|relief\s+pressure|system\s+pressure|rated\s+pressure|pressure\s+(setting|rating|spec))\b",
+    r"\b(fluid\s+capacity|oil\s+capacity|volume\s+capacity)\b",
+    r"\b(step[s\s]+by\s+step|procedure\s+for|how\s+to\s+(replace|repair|adjust|bleed|calibrate|set|change|remove|install))\b",
+    r"\b(spn|fmi)\b",
+    r"\b(fault\s+code|error\s+code|alarm\s+code|dtc)\b",
+    r"\b(service\s+interval|maintenance\s+interval|change\s+interval)\b",
+    r"\bspecification\b",
+]
+_SPECIFIC_FACT_RE = re.compile("|".join(_SPECIFIC_FACT_PATTERNS), flags=re.IGNORECASE)
+
+# General equipment technical vocabulary (not enough alone to force grounded diagnostic)
 _TECHNICAL_RE = re.compile(
-    r"\b(spn|fmi|psi|mpa|rpm|bar|temperature|pressure|vibration|hydraulic|engine|"
-    r"pump|valve|cylinder|fault|error|alarm|sensor|oil|fuel|coolant|torque|"
-    r"excavator|loader|crane|dozer|generator|bearing|hose|leak|noise|smoke|"
-    r"overheating|stall|start|code|diagnostic|maintenance|filter|battery|alternator|"
-    r"sany|xcmg|cat|komatsu|zoomlion|sy215|xe215|boom|bucket|track|undercarriage|"
-    r"swing|slew|travel|throttle|turbo|injector|dpf|egr|ecm|ecu)\b",
+    r"\b(temperature|pressure|vibration|hydraulic|engine|pump|valve|cylinder|"
+    r"sensor|oil|fuel|coolant|excavator|loader|crane|dozer|generator|bearing|"
+    r"hose|leak|noise|smoke|overheating|stall|rpm|bar|psi|mpa|"
+    r"sany|xcmg|cat|caterpillar|komatsu|volvo|doosan|hitachi|liebherr|jcb|"
+    r"sy215|xe215|boom|bucket|track|undercarriage|swing|slew|travel|"
+    r"throttle|turbo|injector|dpf|egr|ecm|ecu|alternator|battery|filter|maintenance)\b",
     flags=re.IGNORECASE
 )
 
 
 def classify_intent(query: str) -> str:
     """
-    Route query to 'conversational' or 'diagnostic'.
+    Three-way intent router:
 
-    Priority:
-    1. Technical keyword present  -> diagnostic
-    2. Conversational pattern     -> conversational
-    3. Short message (<= 6 words) -> conversational
-    4. Default                    -> diagnostic
+    'conversational'    -> greetings, identity, small talk
+                          -> CHAT_SYSTEM_PROMPT, no retrieval
+
+    'general_equipment' -> opinions, brand comparisons, general machinery questions
+                          -> GENERAL_EQUIPMENT_PROMPT, no retrieval
+                          -> also fires for equipment questions when NO specific fact is requested
+
+    'diagnostic'        -> specific fact requests (fault codes, specs, procedures)
+                          -> ChromaDB retrieval
+                          -> if context found: SYSTEM_PROMPT (strict grounding)
+                          -> if context empty: NO_CONTEXT_PROMPT (honest, no fabrication)
+
+    Priority order:
+    1. SPN/FMI pattern or specific fact signal -> diagnostic
+    2. Conversational pattern -> conversational
+    3. Opinion/comparison framing -> general_equipment
+    4. Short with no tech signal -> conversational
+    5. Has technical vocabulary but no specific fact signal -> general_equipment
+    6. Default -> general_equipment (safer than diagnostic for ambiguous queries)
     """
     q = query.strip()
-    if _TECHNICAL_RE.search(q):
+
+    # 1. Specific fact requested -> always diagnostic (safety-critical path)
+    if _SPECIFIC_FACT_RE.search(q):
         return "diagnostic"
+
+    # 2. Clear conversational signal
     if _CONVERSATIONAL_RE.search(q):
         return "conversational"
-    if len(q.split()) <= 6:
+
+    # 3. Opinion/comparison framing -> general (even if equipment keywords present)
+    if _OPINION_RE.search(q):
+        return "general_equipment"
+
+    # 4. Short messages with no tech vocabulary -> conversational
+    if len(q.split()) <= 6 and not _TECHNICAL_RE.search(q):
         return "conversational"
-    return "diagnostic"
+
+    # 5. Has equipment context + describes a symptom/problem WITHOUT specific fact request
+    #    e.g. "CAT error 105 what is wrong" - has technical vocab, but no SPN/FMI/torque/procedure
+    #    -> diagnostic (let retrieval + no-context path handle it honestly)
+    if _TECHNICAL_RE.search(q):
+        return "diagnostic"
+
+    # 6. Default -> general_equipment (better to answer helpfully than to refuse)
+    return "general_equipment"
 
 
 # ---------------------------------------------------------------------------
 # UTILITIES
 # ---------------------------------------------------------------------------
+
+def clean_for_whatsapp(text: str) -> str:
+    """
+    Convert model markdown output to clean WhatsApp-friendly plain text.
+    Removes asterisks, hashes, and other markdown formatting the model tends to emit.
+    """
+    # Remove triple-backtick code blocks
+    text = re.sub(r'```[\s\S]*?```', '', text)
+    # Remove markdown bold/italic: **text** -> text, *text* -> text (but keep bullet hyphens)
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    # Replace *Header:* or *Header* patterns (bold markdown) -> HEADER: in caps
+    text = re.sub(r'\*([A-Za-z][^*\n]{0,40}:)\*', lambda m: m.group(1).upper(), text)
+    # Remove remaining isolated asterisks used as bullets -> hyphen
+    text = re.sub(r'(?m)^\s*\*\s+', '- ', text)
+    # Remove any leftover standalone asterisks
+    text = re.sub(r'\*', '', text)
+    # Remove markdown headers (##, ###, ####) -> plain text with newline
+    text = re.sub(r'(?m)^#{1,4}\s+(.+)$', lambda m: m.group(1).upper(), text)
+    # Remove horizontal rules
+    text = re.sub(r'(?m)^[-_*]{3,}\s*$', '', text)
+    # Collapse 3+ newlines -> 2
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
 
 def strip_emojis(text: str) -> str:
     emoji_pattern = re.compile(
@@ -344,6 +450,11 @@ def strip_emojis(text: str) -> str:
         flags=re.UNICODE
     )
     return emoji_pattern.sub("", text)
+
+
+def clean_response(text: str) -> str:
+    """Full response cleaning pipeline: emojis + markdown."""
+    return clean_for_whatsapp(strip_emojis(text))
 
 
 def _call_ollama(system_prompt: str, user_prompt: str) -> str:
@@ -373,34 +484,47 @@ def _call_ollama(system_prompt: str, user_prompt: str) -> str:
 
 def diagnose_with_rag(query_text: str, sensor_context: str = "") -> str:
     """
-    Intent-routed RAG engine.
+    Three-path intent-routed RAG engine.
 
-    CONVERSATIONAL (greetings, identity, capability, small talk):
-      - No ChromaDB retrieval
-      - Permissive CHAT_SYSTEM_PROMPT, no abstention rules
-      - Fast response path
+    CONVERSATIONAL: greetings, identity, small talk
+      -> CHAT_SYSTEM_PROMPT, no retrieval, fast
 
-    DIAGNOSTIC (fault codes, symptoms, specs, sensor data):
-      - Full ChromaDB retrieval with SPN pinning and brand isolation
-      - Strict SYSTEM_PROMPT with safety and abstention rules
-      - Sensor telemetry context injected when available
+    GENERAL_EQUIPMENT: opinions, brand comparisons, concepts
+      -> GENERAL_EQUIPMENT_PROMPT, no retrieval, answers from general knowledge
+      -> explicitly cannot fabricate specific numbers
+
+    DIAGNOSTIC: specific fact/code/spec/procedure requests
+      -> ChromaDB retrieval
+      -> Context FOUND: SYSTEM_PROMPT (strict grounding, abstention rules)
+      -> Context EMPTY: NO_CONTEXT_PROMPT (honest: "I don't have this data",
+         separates general concepts from diagnosis of the specific unknown code)
     """
     intent = classify_intent(query_text)
     logger.info(f"Intent: '{intent}' | Query: '{query_text[:70]}'")
 
     # -- CONVERSATIONAL PATH --------------------------------------------------
     if intent == "conversational":
-        return strip_emojis(_call_ollama(CHAT_SYSTEM_PROMPT, query_text)).strip()
+        return clean_response(_call_ollama(CHAT_SYSTEM_PROMPT, query_text))
+
+    # -- GENERAL EQUIPMENT PATH -----------------------------------------------
+    if intent == "general_equipment":
+        return clean_response(_call_ollama(GENERAL_EQUIPMENT_PROMPT, query_text))
 
     # -- DIAGNOSTIC PATH (full RAG) -------------------------------------------
     retrieved_context = retrieve_context(query_text, top_k=4)
+
+    # Empty context: honest no-data response, no fabricated cause list
+    if not retrieved_context:
+        logger.info("Diagnostic intent but empty retrieval -> NO_CONTEXT_PROMPT")
+        return clean_response(_call_ollama(NO_CONTEXT_PROMPT, query_text))
+
+    # Context found: strict grounded diagnosis
     prompt_parts = []
-    if retrieved_context:
-        prompt_parts.append(f"[TECHNICAL REFERENCE MANUALS AND FAULT CODES]\n{retrieved_context}")
+    prompt_parts.append(f"[TECHNICAL REFERENCE MANUALS AND FAULT CODES]\n{retrieved_context}")
     if sensor_context:
         prompt_parts.append(f"[LIVE TELEMETRY AND RECENT ALERTS]\n{sensor_context}")
     prompt_parts.append(f"[EQUIPMENT SYMPTOMS / OPERATOR QUERY]\n{query_text}")
-    return strip_emojis(_call_ollama(SYSTEM_PROMPT, "\n\n".join(prompt_parts))).strip()
+    return clean_response(_call_ollama(SYSTEM_PROMPT, "\n\n".join(prompt_parts)))
 
 
 # Alias for backward compatibility
