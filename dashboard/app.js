@@ -9,8 +9,8 @@ const API_BASE = window.location.origin.includes('5500') || window.location.orig
 
 // State
 let activeEquipmentId = 1;
-let isSimulating = true;
-let simInterval = null;
+let pollInterval = null;
+let lastReadingTimestamp = null;
 
 // Chart Instances
 let vibrationChart = null;
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCharts();
   setupEventListeners();
   checkSystemHealth();
-  startSimulation();
+  startRealDataPolling();
   fetchAlerts();
 
   // Polling for health and alert updates
@@ -129,7 +129,7 @@ function initCharts() {
       labels: timeLabels,
       datasets: [
         {
-          label: 'Temp (°C)',
+          label: 'Temp (C)',
           data: tempData,
           borderColor: '#ffffff',
           backgroundColor: 'rgba(255, 255, 255, 0.03)',
@@ -195,10 +195,14 @@ function initCharts() {
   });
 }
 
-// Push New Telemetry
-function pushTelemetry(temp, ax, ay, az, mag, sound) {
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+// Push New Telemetry (display only — no data generation)
+function pushTelemetry(temp, ax, ay, az, mag, sound, timestamp) {
+  let timeStr;
+  if (timestamp) {
+    timeStr = new Date(timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } else {
+    timeStr = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
 
   timeLabels.push(timeStr);
   vibXData.push(ax);
@@ -272,46 +276,60 @@ function pushTelemetry(temp, ax, ay, az, mag, sound) {
   tempChart.update();
 }
 
-// Telemetry Simulation Loop
-function startSimulation() {
-  if (simInterval) clearInterval(simInterval);
+// Real Data Polling — fetch actual sensor readings from the database
+function startRealDataPolling() {
+  if (pollInterval) clearInterval(pollInterval);
 
-  let baseTemp = 74.0;
-  simInterval = setInterval(async () => {
-    // Generate realistic engine telemetry with occasional harmonic fluctuation
-    const tShift = (Math.random() - 0.48) * 0.5;
-    baseTemp = Math.max(68, Math.min(96, baseTemp + tShift));
+  // Initial fetch to populate charts with historical data
+  fetchRealTelemetry(true);
 
-    const ax = +(1.1 + (Math.random() - 0.5) * 0.8).toFixed(2);
-    const ay = +(0.8 + (Math.random() - 0.5) * 0.6).toFixed(2);
-    const az = +(1.5 + (Math.random() - 0.5) * 0.9).toFixed(2);
-    const mag = +Math.sqrt(ax * ax + ay * ay + az * az).toFixed(2);
-    const sound = +(82.0 + Math.random() * 8.0).toFixed(1);
+  // Poll every 3 seconds for new readings
+  pollInterval = setInterval(() => {
+    fetchRealTelemetry(false);
+  }, 3000);
+}
 
-    pushTelemetry(baseTemp, ax, ay, az, mag, sound);
+async function fetchRealTelemetry(isInitial) {
+  try {
+    const limit = isInitial ? MAX_DATA_POINTS : 5;
+    const res = await fetch(`${API_BASE}/api/equipment/${activeEquipmentId}/readings?limit=${limit}`);
+    if (!res.ok) return;
+    const readings = await res.json();
 
-    // Forward simulated reading to backend DB
-    const select = document.getElementById('equipmentSelect');
-    const nodeId = select.options[select.selectedIndex].getAttribute('data-node') || 'NODE-001';
-
-    try {
-      await fetch(`${API_BASE}/api/sensors/data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          node_id: nodeId,
-          temperature: baseTemp,
-          vibration_x: ax,
-          vibration_y: ay,
-          vibration_z: az,
-          vibration_magnitude: mag,
-          sound_level_db: sound
-        })
-      });
-    } catch (e) {
-      // Backend maybe offline
+    if (!readings || readings.length === 0) {
+      if (isInitial) {
+        document.getElementById('tempVal').textContent = '--';
+        document.getElementById('vibVal').textContent = '--';
+        document.getElementById('soundVal').textContent = '--';
+        document.getElementById('axisReadout').textContent = 'AWAITING SENSOR DATA';
+        document.getElementById('lastUpdated').textContent = 'NO READINGS YET';
+      }
+      return;
     }
-  }, 2000);
+
+    // Readings come newest-first, reverse for chronological chart display
+    const sorted = isInitial ? readings.reverse() : readings.reverse();
+
+    for (const r of sorted) {
+      // Skip if we've already displayed this reading
+      if (lastReadingTimestamp && r.timestamp <= lastReadingTimestamp && !isInitial) {
+        continue;
+      }
+      // Use actual stored axis values if available, otherwise derive from magnitude
+      const ax = r.vibration_x !== undefined ? r.vibration_x : r.vibration * 0.5;
+      const ay = r.vibration_y !== undefined ? r.vibration_y : r.vibration * 0.4;
+      const az = r.vibration_z !== undefined ? r.vibration_z : r.vibration * 0.7;
+      const mag = r.vibration || r.vibration_magnitude || 0;
+      pushTelemetry(r.temperature, ax, ay, az, mag, r.sound, r.timestamp);
+    }
+
+    // Track the latest timestamp to avoid duplicate display
+    if (sorted.length > 0) {
+      lastReadingTimestamp = sorted[sorted.length - 1].timestamp;
+    }
+  } catch (e) {
+    // Backend may be offline — display will hold last known values
+  }
 }
 
 // Backend & WhatsApp Bot Health Checks
@@ -387,39 +405,34 @@ async function fetchAlerts() {
 
 // Event Listeners & Chat Form
 function setupEventListeners() {
-  // Equipment Select
+  // Equipment Select — restart real data polling for new equipment
   document.getElementById('equipmentSelect').addEventListener('change', (e) => {
     activeEquipmentId = +e.target.value;
     const node = e.target.options[e.target.selectedIndex].getAttribute('data-node');
     document.getElementById('nodeIdLabel').textContent = `NODE: ${node}`;
+    // Clear existing data and re-fetch for new equipment
+    timeLabels.length = 0;
+    vibXData.length = 0;
+    vibYData.length = 0;
+    vibZData.length = 0;
+    vibMagData.length = 0;
+    tempData.length = 0;
+    soundData.length = 0;
+    lastReadingTimestamp = null;
+    startRealDataPolling();
   });
 
-  // Sim Button Toggle
-  const simBtn = document.getElementById('btnSimulate');
-  simBtn.addEventListener('click', () => {
-    isSimulating = !isSimulating;
-    if (isSimulating) {
-      simBtn.classList.add('active');
-      startSimulation();
-    } else {
-      simBtn.classList.remove('active');
-      if (simInterval) clearInterval(simInterval);
-    }
-  });
-
-  // Sync DB Button
+  // Sync DB Button — force refresh from backend
   document.getElementById('btnRefresh').addEventListener('click', async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/equipment/${activeEquipmentId}/readings?limit=20`);
-      if (res.ok) {
-        const readings = await res.json();
-        readings.reverse().forEach(r => {
-          pushTelemetry(r.temperature, 1.2, 0.9, 1.5, r.vibration, r.sound);
-        });
-      }
-    } catch (e) {
-      alert('Unable to connect to FastAPI backend on port 8080.');
-    }
+    lastReadingTimestamp = null;
+    timeLabels.length = 0;
+    vibXData.length = 0;
+    vibYData.length = 0;
+    vibZData.length = 0;
+    vibMagData.length = 0;
+    tempData.length = 0;
+    soundData.length = 0;
+    await fetchRealTelemetry(true);
   });
 
   // Quick Prompt Chips

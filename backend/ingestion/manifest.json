@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-09-18T11:15:49.242534+00:00",
+  "total_chunks_indexed": 4,
+  "files": {
+    "sany_sy215c_service_manual.pdf": {
+      "path": "C:\\Users\\XPS\\Downloads\\china\\mechmind-ai\\backend\\manuals\\sany_sy215c_service_manual.pdf",
+      "sha256": "7c4cff959bf486a04fc44c3dac26c25c2249e79ffd4bd714b8a9927c056105e6",
+      "file_size_bytes": 12785,
+      "pages": 3,
+      "chunks": 2,
+      "equipment_model": "SANY SY215C",
+      "ingested_at": "2026-09-17T14:31:38.405708+00:00"
+    },
+    "xcmg_xe215c_service_manual.pdf": {
+      "path": "C:\\Users\\XPS\\Downloads\\china\\mechmind-ai\\backend\\manuals\\xcmg_xe215c_service_manual.pdf",
+      "sha256": "521392c33a88d8e1ac994cc14185fa88abce4a704a5443496bebd7c841eca13e",
+      "file_size_bytes": 13603,
+      "pages": 3,
+      "chunks": 2,
+      "equipment_model": "XCMG XE215C",
+      "ingested_at": "2026-09-18T11:15:49.242516+00:00"
+    }
+  }
+}

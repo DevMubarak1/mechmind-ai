@@ -35,6 +35,7 @@ apiApp.use((req, res, next) => {
 let sock = null;
 let latestQR = null;
 let latestPairingCode = null;
+const sentBotMessageIds = new Set();
 
 // ========================
 // WhatsApp Connection
@@ -111,18 +112,65 @@ async function startBot() {
         if (type !== 'notify') return;
 
         for (const msg of messages) {
-            if (msg.key.fromMe) continue; // Skip our own messages
             if (!msg.message) continue;
+            // Ignore messages sent by our bot
+            if (msg.key.id && sentBotMessageIds.has(msg.key.id)) continue;
 
             const sender = msg.key.remoteJid;
             // Ignore WhatsApp Status/Stories, broadcasts, and group chats
             if (!sender || sender === 'status@broadcast' || sender.endsWith('@broadcast') || sender.endsWith('@g.us')) {
                 continue;
             }
-            if (!sender.endsWith('@s.whatsapp.net')) {
+            if (!sender.endsWith('@s.whatsapp.net') && !sender.endsWith('@lid')) {
                 continue;
             }
 
+            const msgContent = msg.message;
+            const text = (
+                msgContent.conversation ||
+                msgContent.extendedTextMessage?.text ||
+                msgContent.imageMessage?.caption ||
+                ''
+            ).trim();
+
+            // Ignore messages that start with bot response prefixes to prevent echo loops
+            if (
+                text.startsWith('*MechMind') ||
+                text.startsWith('*Diagnostic Request') ||
+                text.startsWith('*Voice Processing') ||
+                text.startsWith('*Visual Inspection') ||
+                text.startsWith('Could not connect') ||
+                text.startsWith('Could not process') ||
+                text.startsWith('An error occurred') ||
+                text.startsWith('*ALERT from') ||
+                text.startsWith('*Transcribed:*') ||
+                text.startsWith('Diagnostic service')
+            ) {
+                continue;
+            }
+
+            const myNumber = sock?.user?.id ? sock.user.id.replace(/:\d+/, '').replace(/\D/g, '') : '';
+            const myLid = sock?.user?.lid ? sock.user.lid.replace(/:\d+/, '').replace(/\D/g, '') : '';
+            const senderClean = sender.replace(/\D/g, '');
+
+            const isSelfChat = (myNumber && senderClean === myNumber) || (myLid && senderClean === myLid) || sender.includes('@lid');
+            const isAlertRecipient = ALERT_RECIPIENTS.some(r => {
+                const clean = r.replace(/\D/g, '');
+                return clean && (senderClean.includes(clean) || clean.includes(senderClean));
+            });
+            const isFromMe = !!msg.key.fromMe;
+            const isCommand = text.startsWith('/');
+
+            // Allow messages if:
+            // 1. Sent to us by another user (!isFromMe)
+            // 2. Sent by user in self-chat (isSelfChat)
+            // 3. Sent by user in test/alert recipient chat (isAlertRecipient)
+            // 4. Any message beginning with a command (/help, /status, etc.)
+            if (isFromMe && !isSelfChat && !isAlertRecipient && !isCommand) {
+                continue;
+            }
+
+            console.log(`[MSG] Processing message from ${sender} (fromMe: ${isFromMe}): "${text || '[media]'}"`);
             await handleMessage(msg, sender);
         }
     });
@@ -133,61 +181,68 @@ async function startBot() {
 // ========================
 
 async function handleMessage(msg, sender) {
-    const phoneNumber = sender.replace('@s.whatsapp.net', '');
-    console.log(`[MSG] Incoming message from ${phoneNumber}`);
+    const phoneNumber = sender.replace('@s.whatsapp.net', '').replace('@lid', '');
 
     try {
         const msgContent = msg.message;
         
         if (msgContent.conversation || msgContent.extendedTextMessage) {
-            const text = msgContent.conversation || msgContent.extendedTextMessage?.text || '';
+            const text = (msgContent.conversation || msgContent.extendedTextMessage?.text || '').trim();
+            const lower = text.toLowerCase();
             
-            if (text.toLowerCase() === '/help' || text.toLowerCase() === 'help') {
+            if (lower === '/help') {
                 await sendHelp(sender);
                 return;
             }
             
-            if (text.toLowerCase() === '/status') {
+            if (lower === '/status' || lower === 'status') {
                 await sendStatus(sender);
                 return;
             }
 
             await handleTextQuery(sender, phoneNumber, text);
         } else if (msgContent.audioMessage) {
-            console.log('   Audio message received');
+            console.log('   Audio message received from', sender);
             await handleAudioMessage(msg, sender, phoneNumber);
         } else if (msgContent.imageMessage) {
-            console.log('   Image message received');
+            console.log('   Image message received from', sender);
             await handleImageMessage(msg, sender, phoneNumber);
         }
     } catch (err) {
         console.error('Error handling message:', err);
-        await sendMessage(sender, 'Sorry, an error occurred processing your request. Please try again.');
+        await sendMessage(sender, 'An error occurred processing your request. Please check backend.');
     }
 }
 
 // Handle text diagnostic queries
 async function handleTextQuery(sender, phoneNumber, text) {
-    await sendMessage(sender, 'Thinking... Analyzing with MechMind AI...');
-
     try {
+        // Send immediate interim acknowledgment to prevent user confusion during 8B CPU inference (p95 ~100s)
+        await sendMessage(sender, "*MechMind AI* is analyzing your query. Please wait.");
+
         const res = await axios.post(`${BACKEND_URL}/api/diagnose`, {
             phone_number: phoneNumber,
             message: text,
-            equipment_id: 1 // Default to equipment 1, or parse from message
+            equipment_id: 1
+        }, {
+            timeout: 180000 // 180s timeout (comfortably exceeds p95 latency of 100.58s)
         });
 
         const response = res.data.response || 'No diagnosis available.';
-        await sendMessage(sender, `*MechMind AI Diagnosis:*\n\n${response}`);
+        await sendMessage(sender, response);
     } catch (err) {
         console.error('Backend API error:', err.message);
-        await sendMessage(sender, 'Could not connect to the diagnostic engine. Is the backend running?');
+        if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+            await sendMessage(sender, '*Diagnostic Request Timed Out* - The diagnostic engine took longer than expected. Please retry your query.');
+        } else {
+            await sendMessage(sender, 'Could not connect to the diagnostic engine. Is the backend running on port 8080?');
+        }
     }
 }
 
 // Handle voice notes
 async function handleAudioMessage(msg, sender, phoneNumber) {
-    await sendMessage(sender, 'Transcribing your voice note...');
+    await sendMessage(sender, '*MechMind AI* is transcribing your voice note. Please wait.');
 
     try {
         const buffer = await downloadMediaMessage(msg, 'buffer', {});
@@ -200,7 +255,7 @@ async function handleAudioMessage(msg, sender, phoneNumber) {
 
         const res = await axios.post(`${BACKEND_URL}/api/diagnose/voice`, formData, {
             headers: formData.getHeaders(),
-            timeout: 60000
+            timeout: 180000 // 180s timeout
         });
 
         // Cleanup
@@ -210,17 +265,21 @@ async function handleAudioMessage(msg, sender, phoneNumber) {
         await sendMessage(sender, `*Transcribed:* "${transcription}"\n\n*MechMind AI Diagnosis:*\n\n${response}`);
     } catch (err) {
         console.error('Voice processing error:', err.message);
-        await sendMessage(sender, 'Could not process audio. Please send a text message instead.');
+        if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+            await sendMessage(sender, '*Voice Processing Timed Out* - Please send a text query instead.');
+        } else {
+            await sendMessage(sender, 'Could not process audio. Please send a text message instead.');
+        }
     }
 }
 
 // Handle images
 async function handleImageMessage(msg, sender, phoneNumber) {
-    await sendMessage(sender, 'Analyzing your image...');
+    await sendMessage(sender, '*MechMind AI* is analyzing your image. Please wait.');
 
     try {
         const buffer = await downloadMediaMessage(msg, 'buffer', {});
-        const caption = msg.message.imageMessage.caption || 'Equipment inspection';
+        const caption = msg.message.imageMessage?.caption || 'Equipment inspection';
         const tempPath = path.join(__dirname, `temp_img_${Date.now()}.jpg`);
         fs.writeFileSync(tempPath, buffer);
 
@@ -231,7 +290,7 @@ async function handleImageMessage(msg, sender, phoneNumber) {
 
         const res = await axios.post(`${BACKEND_URL}/api/diagnose/image`, formData, {
             headers: formData.getHeaders(),
-            timeout: 60000
+            timeout: 180000 // 180s timeout
         });
 
         try { fs.unlinkSync(tempPath); } catch (e) {}
@@ -240,7 +299,11 @@ async function handleImageMessage(msg, sender, phoneNumber) {
         await sendMessage(sender, `*Visual Inspection Analysis:*\n\n${response}`);
     } catch (err) {
         console.error('Image processing error:', err.message);
-        await sendMessage(sender, 'Could not process image. Please try again.');
+        if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+            await sendMessage(sender, '*Visual Inspection Timed Out* - Please retry with a smaller image.');
+        } else {
+            await sendMessage(sender, 'Could not process image. Please try again.');
+        }
     }
 }
 
@@ -249,11 +312,11 @@ async function sendHelp(sender) {
     const helpText = `*MechMind AI - Field Assistant*
 
 Send me any of the following:
-• *Text*: Describe symptoms (e.g., "hydraulic pump overheating at 90C")
-• *Voice Note*: Speak naturally in English, Pidgin, or Hausa
-• *Photo*: Send a picture of the damaged component or gauge
-• */status*: Check current machinery status
-• */help*: Show this help menu
+- *Text*: Describe symptoms (e.g., "hydraulic pump overheating at 90C")
+- *Voice Note*: Speak naturally in English, Pidgin, or Hausa
+- *Photo*: Send a picture of the damaged component or gauge
+- */status*: Check current machinery status
+- */help*: Show this help menu
 
 *Tip*: Include equipment name (CAT 320, XCMG loader, etc.) for better diagnosis.`;
 
@@ -281,8 +344,21 @@ async function sendStatus(sender) {
 
 // Helper: send text message
 async function sendMessage(jid, text) {
-    if (!sock) return;
-    await sock.sendMessage(jid, { text });
+    if (!sock) return null;
+    try {
+        const sent = await sock.sendMessage(jid, { text });
+        if (sent?.key?.id) {
+            sentBotMessageIds.add(sent.key.id);
+            if (sentBotMessageIds.size > 1000) {
+                const first = sentBotMessageIds.values().next().value;
+                sentBotMessageIds.delete(first);
+            }
+        }
+        return sent;
+    } catch (err) {
+        console.error(`[MECHMIND BOT] Error sending message to ${jid}:`, err.message);
+        return null;
+    }
 }
 
 // ========================

@@ -2,6 +2,7 @@
 MechMind AI — FastAPI Backend
 Sensor data ingestion, anomaly detection, AI diagnostics, RAG pipeline
 """
+import re
 import os
 import json
 import logging
@@ -22,6 +23,30 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
+
+# Emoji removal regex pattern
+EMOJI_PATTERN = re.compile(
+    "["
+    "\U0001F600-\U0001F64F"  # emoticons
+    "\U0001F300-\U0001F5FF"  # symbols & pictographs
+    "\U0001F680-\U0001F6FF"  # transport & map symbols
+    "\U0001F1E0-\U0001F1FF"  # flags
+    "\U00002702-\U000027B0"
+    "\U000024C2-\U0001F251"
+    "\U0001F900-\U0001F9FF"  # supplemental symbols
+    "\U0001FA00-\U0001FA6F"  # symbols and pictographs extended-a
+    "\U0001FA70-\U0001FAFF"  # symbols and pictographs extended-b
+    "\U00002600-\U000026FF"  # misc symbols
+    "]+", flags=re.UNICODE
+)
+
+def strip_emojis(text: str) -> str:
+    """Ensure strictly no emojis appear in outputs"""
+    if not text:
+        return ""
+    cleaned = EMOJI_PATTERN.sub("", text)
+    return re.sub(r"[ \t]+", " ", cleaned)
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mechmind")
@@ -212,7 +237,7 @@ async def check_thresholds(db, equipment_id, equipment_type, data: SensorData):
             severity = "warning"
         
         if severity:
-            message = f"⚠️ {severity.upper()}: {metric.replace('_', ' ').title()} is {value}{unit} (threshold: {warning}/{critical}{unit})"
+            message = f"[{severity.upper()} ALERT]: {metric.replace('_', ' ').title()} is {value}{unit} (threshold: {warning}/{critical}{unit})"
             
             db.execute(text("""
                 INSERT INTO alerts (equipment_id, alert_type, severity, message, sensor_value, threshold)
@@ -244,80 +269,14 @@ async def send_whatsapp_alert(message: str, node_id: str):
 
 
 # ========================
-# AI Diagnostic Engine
+# AI Diagnostic Engine (Integrated ChromaDB RAG + Llama 3.1:8b)
 # ========================
-
-SYSTEM_PROMPT = """You are MechMind AI, an expert construction equipment diagnostic assistant. You help field mechanics and operators diagnose problems with excavators, loaders, cranes, generators, and other construction machinery.
-
-When given sensor data or a user description of a problem, you:
-1. Analyze the symptoms
-2. Identify probable causes (ranked by likelihood)
-3. Recommend immediate actions
-4. Suggest preventive maintenance steps
-
-Be concise but thorough. Use simple language that a field mechanic understands.
-If you have sensor data context, reference specific readings in your diagnosis.
-Always prioritize safety — if a reading indicates danger, warn immediately.
-
-Format responses for WhatsApp (use emojis sparingly, short paragraphs, numbered lists)."""
-
-
-def generate_expert_diagnosis(query_text: str, sensor_context: str = "") -> str:
-    """Deterministic heuristic diagnostic engine for heavy equipment if LLM is offline"""
-    q = query_text.lower()
-    
-    if "temp" in q or "overheat" in q or "hot" in q or "oil" in q:
-        return (
-            "⚠️ *MechMind AI Diagnostic Report: Thermal Anomaly*\n\n"
-            "*1. Probable Causes:*\n"
-            "• Hydraulic oil cooler radiator clogged with construction debris or dust.\n"
-            "• Main relief valve bypass failure causing continuous pump pressure build-up.\n"
-            "• Low hydraulic reservoir level or degraded anti-wear oil viscosity.\n\n"
-            "*2. Immediate Action:*\n"
-            "• Idle engine immediately and verify hydraulic cooler fan operation.\n"
-            "• Inspect sight glass on reservoir for oil level and foaming.\n\n"
-            "*3. Preventive Steps:*\n"
-            "• Pressure wash oil cooler matrix every 250 operating hours."
-        )
-    elif "vib" in q or "shake" in q or "bearing" in q or "shock" in q:
-        return (
-            "⚙️ *MechMind AI Diagnostic Report: Vibration Anomaly*\n\n"
-            "*1. Probable Causes:*\n"
-            "• ADXL345 detected harmonic unbalance in main hydraulic pump shaft.\n"
-            "• Slew ring bearing raceway fatigue or loose turret mounting bolts.\n"
-            "• Track motor planetary gear wear or loose engine damper mount.\n\n"
-            "*2. Immediate Action:*\n"
-            "• Torque check all pump and engine mount bolts to OEM spec.\n"
-            "• Perform visual check on slew gear teeth for pitting or metal flakes.\n\n"
-            "*3. Preventive Steps:*\n"
-            "• Grease slew bearing raceway every 50 operating hours."
-        )
-    elif "knock" in q or "sound" in q or "noise" in q or "whine" in q:
-        return (
-            "🔊 *MechMind AI Diagnostic Report: Acoustic / Noise Anomaly*\n\n"
-            "*1. Probable Causes:*\n"
-            "• Hydraulic pump cavitation due to restricted suction strainer.\n"
-            "• Turbocharger compressor wheel rub or shaft bearing play.\n"
-            "• Fuel injection pump knock or valve lash clearance out of spec.\n\n"
-            "*2. Immediate Action:*\n"
-            "• Check suction line hose for soft collapse under high engine RPM.\n"
-            "• Bleed hydraulic tank breather filter.\n\n"
-            "*3. Safety Notice:*\n"
-            "• Continued operation under pump cavitation will result in catastrophic pump failure."
-        )
-    else:
-        return (
-            "🔍 *MechMind AI Telemetry Diagnostic Summary*\n\n"
-            "Telemetry analysis completed for active asset.\n"
-            "• *Status:* Operating parameters monitored by ADXL345 and NTC probe.\n"
-            "• *Recommendation:* Verify fluid levels, grease slew ring, and clean engine radiator.\n"
-            "For a specific component diagnosis, ask about: *temperature*, *vibration*, *unusual noises*, or *pump pressure*."
-        )
+from rag_engine import diagnose_with_rag
 
 
 @app.post("/api/diagnose")
 async def diagnose(query: DiagnosticQuery):
-    """AI diagnostic endpoint — called by WhatsApp bot"""
+    """AI diagnostic endpoint — called by WhatsApp bot and web dashboard"""
     
     # Get recent sensor data for context
     sensor_context = ""
@@ -330,7 +289,7 @@ async def diagnose(query: DiagnosticQuery):
             """), {"eq_id": query.equipment_id}).fetchall()
             
             if readings:
-                sensor_context = "\n\nRecent sensor readings:\n"
+                sensor_context = "Recent equipment sensor readings:\n"
                 for temp, vib, sound, ts in readings:
                     sensor_context += f"- {ts}: Temp={temp}°C, Vibration={vib}g, Sound={sound}dB\n"
         
@@ -346,30 +305,15 @@ async def diagnose(query: DiagnosticQuery):
             for sev, msg, ts in alerts:
                 sensor_context += f"- [{sev}] {msg}\n"
     
-    # Call Ollama with fallback
-    full_prompt = f"{query.message}{sensor_context}"
-    ai_response = None
+    # Call the production RAG engine (ChromaDB + llama3.1:8b + Safety Guardrails)
+    logger.info(f"Running RAG diagnosis for query: '{query.message[:60]}...'")
+    ai_response = diagnose_with_rag(query_text=query.message, sensor_context=sensor_context.strip())
     
-    # Try active Ollama model (llama3.2:3b or llama3.1:8b)
-    for model_name in [OLLAMA_MODEL, "llama3.2:3b", "llama3.1:8b"]:
-        try:
-            response = ollama.chat(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": full_prompt}
-                ]
-            )
-            ai_response = response.message.content
-            if ai_response:
-                break
-        except Exception as e:
-            logger.warning(f"Ollama attempt with {model_name} failed: {e}")
-            continue
-
     if not ai_response:
-        ai_response = generate_expert_diagnosis(query.message, sensor_context)
+        ai_response = "Diagnostic service temporarily unavailable. Please verify local Ollama llama3.1:8b status."
     
+    ai_response = strip_emojis(ai_response).strip()
+
     # Store diagnostic session
     with SessionLocal() as db:
         db.execute(text("""
@@ -484,32 +428,34 @@ async def diagnose_image(file: UploadFile = File(...), phone_number: str = Form(
         cap = user_caption.lower()
         if any(w in cap for w in ["leak", "oil", "fluid", "hose"]):
             vision_response = (
-                "🔍 *MechMind AI Visual Inspection Report*\n\n"
+                "*MechMind AI Visual Inspection Report: Hydraulic System*\n\n"
                 "*1. Visual Findings:*\n"
-                "• High-pressure hydraulic fitting weeping or damaged seal ring detected.\n"
-                "• Fluid discoloration indicates potential thermal oxidation of oil.\n\n"
+                "- High-pressure hydraulic fitting weeping or damaged seal ring detected.\n"
+                "- Fluid discoloration indicates potential thermal oxidation of oil.\n\n"
                 "*2. Immediate Recommendation:*\n"
-                "• Depressurize hydraulic circuit before tightening fitting or replacing O-ring.\n"
-                "• Check reservoir level sight gauge immediately."
+                "- Depressurize hydraulic circuit before tightening fitting or replacing O-ring.\n"
+                "- Check reservoir level sight gauge immediately."
             )
         elif any(w in cap for w in ["crack", "metal", "weld", "boom", "arm"]):
             vision_response = (
-                "⚠️ *MechMind AI Visual Inspection Report*\n\n"
+                "*MechMind AI Visual Inspection Report: Structural Component*\n\n"
                 "*1. Visual Findings:*\n"
-                "• Structural stress fracture or weld fatigue line identified.\n"
-                "• High-stress concentration area on boom/arm bracket.\n\n"
+                "- Structural stress fracture or weld fatigue line identified.\n"
+                "- High-stress concentration area on boom/arm bracket.\n\n"
                 "*2. Immediate Recommendation:*\n"
-                "• Cease heavy digging/lifting operations immediately to prevent structural tear.\n"
-                "• Perform dye penetrant inspection and gouge/reweld per OEM structural specs."
+                "- Cease heavy digging/lifting operations immediately to prevent structural tear.\n"
+                "- Perform dye penetrant inspection and gouge/reweld per OEM structural specs."
             )
         else:
             vision_response = (
-                f"📸 *MechMind AI Visual Inspection Report*\n\n"
+                f"*MechMind AI Visual Inspection Report*\n\n"
                 f"*Observation:* Image received for {user_caption}.\n"
-                "• Component visually logged into maintenance record.\n"
-                "• Cross-referenced with active asset telemetry (ADXL345 vibration and temperature probes).\n\n"
+                "- Component visually logged into maintenance record.\n"
+                "- Cross-referenced with active asset telemetry (ADXL345 vibration and temperature probes).\n\n"
                 "*Recommendation:* Inspect mounting fasteners, clean debris around cooling fins, and verify seal integrity."
             )
+
+    vision_response = strip_emojis(vision_response or "Visual inspection complete.").strip()
 
     with SessionLocal() as db:
         db.execute(text("""
@@ -540,12 +486,12 @@ async def get_readings(equipment_id: int, limit: int = 50):
     """Get sensor readings for an equipment"""
     with SessionLocal() as db:
         rows = db.execute(text("""
-            SELECT temperature, vibration_magnitude, sound_level_db, timestamp
+            SELECT temperature, vibration_x, vibration_y, vibration_z, vibration_magnitude, sound_level_db, timestamp
             FROM sensor_readings WHERE equipment_id = :id
             ORDER BY timestamp DESC LIMIT :lim
         """), {"id": equipment_id, "lim": limit}).fetchall()
         
-        return [{"temperature": r[0], "vibration": r[1], "sound": r[2], "timestamp": r[3].isoformat()} for r in rows]
+        return [{"temperature": r[0], "vibration_x": r[1], "vibration_y": r[2], "vibration_z": r[3], "vibration": r[4], "sound": r[5], "timestamp": r[6].isoformat()} for r in rows]
 
 @app.get("/api/alerts")
 async def get_alerts(limit: int = 20):

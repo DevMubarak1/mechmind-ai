@@ -1,0 +1,59 @@
+{
+  "dataset": "Case Western Reserve University (CWRU) Bearing Data Center",
+  "bearing_model": "SKF 6205-2RS Deep Groove Ball Bearing",
+  "purpose": "ADXL345 accelerometer calibration & defect frequency matching (NOT for RAG vector search)",
+  "bearing_geometry": {
+    "pitch_diameter_mm": 39.04,
+    "ball_diameter_mm": 7.94,
+    "number_of_balls": 9,
+    "contact_angle_deg": 0.0
+  },
+  "kinematic_frequency_multipliers": {
+    "bpfo_multiplier": 3.5848,
+    "bpfi_multiplier": 5.4152,
+    "bsf_multiplier": 2.3567,
+    "ftf_multiplier": 0.3983
+  },
+  "empirical_statistical_benchmarks": {
+    "healthy_bearing": {
+      "rms_g": 0.521,
+      "peak_g": 1.479,
+      "crest_factor": 2.84,
+      "kurtosis": 2.33
+    },
+    "outer_race_fault": {
+      "rms_g": 2.572,
+      "peak_g": 6.025,
+      "crest_factor": 2.34,
+      "kurtosis": 2.39
+    },
+    "inner_race_fault": {
+      "rms_g": 4.55,
+      "peak_g": 10.38,
+      "crest_factor": 2.28,
+      "kurtosis": 2.84
+    }
+  },
+  "calibrated_adxl345_thresholds": {
+    "normal": {
+      "rms_max_g": 1.5,
+      "kurtosis_max": 3.8,
+      "status": "NORMAL",
+      "action": "Vibration within ISO 10816 Class II industrial machinery standards."
+    },
+    "warning": {
+      "rms_min_g": 1.5,
+      "rms_max_g": 4.0,
+      "kurtosis_min": 3.8,
+      "kurtosis_max": 6.5,
+      "status": "WARNING",
+      "action": "Incipient fatigue wear or surface micro-pitting. Schedule grease lubrication / bearing check."
+    },
+    "critical": {
+      "rms_min_g": 4.0,
+      "kurtosis_min": 6.5,
+      "status": "CRITICAL",
+      "action": "CRITICAL: Severe spalling or race flaking. Immediate replacement required to avoid shaft seizure."
+    }
+  }
+}

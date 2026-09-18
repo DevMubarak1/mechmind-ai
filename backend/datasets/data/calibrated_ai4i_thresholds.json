@@ -1,0 +1,41 @@
+{
+  "dataset": "AI4I 2020 Predictive Maintenance (UCI)",
+  "purpose": "Sensor anomaly threshold calibration for heavy machinery (NOT for RAG vector search)",
+  "sample_count": 10000,
+  "total_failure_events": 339,
+  "failure_breakdown": {
+    "heat_dissipation_failures": 115,
+    "power_failures": 95,
+    "overstrain_failures": 98,
+    "tool_wear_failures": 46
+  },
+  "calibrated_decision_boundaries": {
+    "heat_dissipation_failure": {
+      "rule": "delta_T < 8.6K AND rotational_speed < 1380 RPM",
+      "delta_T_critical_k": 8.6,
+      "rot_speed_critical_rpm": 1379.0,
+      "physical_meaning": "Poor air heat transfer while engine/pump runs at low RPM under load. Radiator core clogged or fan hydraulic slip.",
+      "alert_severity": "CRITICAL"
+    },
+    "power_failure": {
+      "rule": "Power < 3500W (Stall/Cavitation) OR Power > 9000W (Overload)",
+      "power_lower_bound_watts": 3500.0,
+      "power_upper_bound_watts": 9000.0,
+      "physical_meaning": "Hydraulic motor or engine operating outside permissible mechanical power curve.",
+      "alert_severity": "CRITICAL"
+    },
+    "overstrain_failure": {
+      "rule": "Tool_Wear (min) * Torque (Nm) > 11,000",
+      "strain_threshold": 11003.2,
+      "physical_meaning": "Combined mechanical wear and extreme torque exceeding material yield strength.",
+      "alert_severity": "WARNING_TO_CRITICAL"
+    },
+    "tool_wear_failure": {
+      "rule": "Tool_Wear >= 200 min (Warning), >= 240 min (Critical)",
+      "warning_wear_min": 200.0,
+      "critical_wear_min": 240.0,
+      "physical_meaning": "Cumulative mechanical contact fatigue limit reached. Chisel or bucket tooth replacement required.",
+      "alert_severity": "WARNING"
+    }
+  }
+}
