@@ -391,13 +391,58 @@ def classify_intent(query: str) -> str:
         return "conversational"
 
     # 5. Has equipment context + describes a symptom/problem WITHOUT specific fact request
-    #    e.g. "CAT error 105 what is wrong" - has technical vocab, but no SPN/FMI/torque/procedure
     #    -> diagnostic (let retrieval + no-context path handle it honestly)
     if _TECHNICAL_RE.search(q):
         return "diagnostic"
 
     # 6. Default -> general_equipment (better to answer helpfully than to refuse)
     return "general_equipment"
+
+
+# ---------------------------------------------------------------------------
+# PROPRIETARY BRAND CODE DETECTOR
+# ---------------------------------------------------------------------------
+
+# OEM brands whose fault codes are proprietary and NOT in MechMind's knowledge base
+_UNSUPPORTED_BRANDS_RE = re.compile(
+    r"\b(cat|caterpillar|komatsu|volvo|doosan|hitachi|liebherr|jcb|john\s*deere|"
+    r"case|kobelco|sumitomo|hyundai\s+construction|daewoo|kawasaki|kubota|yanmar|"
+    r"manitowoc|grove|tadano|liebherr|terex)\b",
+    flags=re.IGNORECASE
+)
+
+# Proprietary error code patterns: "error 105", "fault E05", "code 203", "alarm 7"
+# Excludes J1939 SPN/FMI which are already handled by _SPECIFIC_FACT_RE
+_PROPRIETARY_CODE_RE = re.compile(
+    r"\b(error|fault|code|alarm|warning)\s*[a-z]?\s*\d{1,5}\b",
+    flags=re.IGNORECASE
+)
+
+
+def _is_proprietary_brand_code_query(query: str) -> bool:
+    """
+    Returns True when a query asks about a fault code from an OEM brand that
+    is NOT in MechMind's knowledge base (CAT, Komatsu, Volvo, etc.).
+
+    These queries MUST NOT retrieve SANY/XCMG passages from ChromaDB, because
+    retrieved context would be used to fabricate a diagnosis for the unknown code.
+    They go directly to NO_CONTEXT_PROMPT with prefill instead.
+
+    Examples that return True:
+        "CAT excavator error 105"          -> True
+        "Komatsu PC200 fault E07"          -> True
+        "Help with Volvo code 1234"        -> True
+
+    Examples that return False (handled by other paths):
+        "SPN 100 FMI 1"                    -> False (J1939 - grounded diagnostic)
+        "what do you think about CAT"      -> False (no code - general_equipment)
+        "SANY SY215C hydraulic fault"      -> False (supported brand)
+    """
+    # J1939 SPN/FMI codes are supported - don't intercept
+    if re.search(r"\b(spn|fmi)\s*\d+", query, re.IGNORECASE):
+        return False
+    return bool(_UNSUPPORTED_BRANDS_RE.search(query) and _PROPRIETARY_CODE_RE.search(query))
+
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +523,36 @@ def _call_ollama(system_prompt: str, user_prompt: str) -> str:
         return f"Diagnostic service unavailable: {e}"
 
 
+def _call_ollama_prefill(system_prompt: str, user_prompt: str, prefill: str) -> str:
+    """
+    Ollama inference with assistant prefill.
+    Injects the start of the assistant response to prevent the model from
+    defaulting to its trained header structure (PROBABLE CAUSES: / IMMEDIATE ACTIONS:).
+    The model continues from `prefill` rather than generating from scratch.
+    """
+    model_name = "llama3.1:8b"
+    try:
+        response = ollama.chat(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+                {"role": "assistant", "content": prefill}
+            ]
+        )
+        raw = ""
+        if hasattr(response, "message") and hasattr(response.message, "content"):
+            raw = response.message.content
+        elif isinstance(response, dict):
+            raw = response.get("message", {}).get("content", "")
+        # Prepend the prefill so the full response reads coherently
+        return prefill + raw
+    except Exception as e:
+        logger.error(f"Ollama prefill call failed: {e}")
+        return f"Diagnostic service unavailable: {e}"
+
+
+
 # ---------------------------------------------------------------------------
 # MAIN ENTRY POINT
 # ---------------------------------------------------------------------------
@@ -511,12 +586,25 @@ def diagnose_with_rag(query_text: str, sensor_context: str = "") -> str:
         return clean_response(_call_ollama(GENERAL_EQUIPMENT_PROMPT, query_text))
 
     # -- DIAGNOSTIC PATH (full RAG) -------------------------------------------
+
+    # PRE-CHECK: Proprietary brand code query (CAT error 105, Komatsu fault E07, etc.)
+    # These MUST skip ChromaDB retrieval entirely. Retrieving SANY/XCMG passages
+    # and feeding them as context would cause the model to apply SANY specs to a
+    # CAT/Komatsu code — fabrication via the wrong-context path, not the empty-context path.
+    if _is_proprietary_brand_code_query(query_text):
+        logger.info("Proprietary brand code detected -> NO_CONTEXT_PROMPT (prefill, no retrieval)")
+        prefill = "I don't have reference data for this specific brand or fault code. "
+        return clean_response(_call_ollama_prefill(NO_CONTEXT_PROMPT, query_text, prefill))
+
     retrieved_context = retrieve_context(query_text, top_k=4)
 
     # Empty context: honest no-data response, no fabricated cause list
+    # Use assistant prefill to prevent model defaulting to PROBABLE CAUSES: header
     if not retrieved_context:
-        logger.info("Diagnostic intent but empty retrieval -> NO_CONTEXT_PROMPT")
-        return clean_response(_call_ollama(NO_CONTEXT_PROMPT, query_text))
+        logger.info("Diagnostic intent but empty retrieval -> NO_CONTEXT_PROMPT (prefill)")
+        prefill = "I don't have reference data for this specific brand or fault code. "
+        return clean_response(_call_ollama_prefill(NO_CONTEXT_PROMPT, query_text, prefill))
+
 
     # Context found: strict grounded diagnosis
     prompt_parts = []
