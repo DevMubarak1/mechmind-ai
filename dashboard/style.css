@@ -489,86 +489,369 @@ body {
 }
 
 /* ==========================================================
-   Diagnostic Console (Copilot)
+   Diagnostic Console — The WhatsApp AI Experience
    ========================================================== */
 .console-panel {
   display: flex;
   flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
-.console-status-tag {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  padding: 2px 6px;
-  background: transparent;
-  border: 1px solid var(--status-normal);
-  color: var(--status-normal);
+.wa-copilot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--bg-surface-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wa-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.wa-avatar-symbol {
+  width: 32px;
+  height: 32px;
+  background: var(--text-primary);
+  color: var(--bg-canvas);
   border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
-.console-body {
-  height: 260px;
-  overflow-y: auto;
-  padding: 1rem 1.25rem;
+.wa-header-info {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  background: var(--bg-canvas);
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  line-height: 1.55;
+  gap: 2px;
 }
 
-.console-body::-webkit-scrollbar {
+.wa-copilot-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+.wa-online-indicator {
+  width: 6px;
+  height: 6px;
+  background: var(--status-normal);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+}
+
+.wa-copilot-sub {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.btn-chat-reset {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-chat-reset:hover {
+  background: var(--text-primary);
+  color: var(--bg-canvas);
+  border-color: var(--text-primary);
+}
+
+/* Chat Thread Container */
+.wa-chat-thread {
+  height: 320px;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--bg-canvas);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 0);
+  background-size: 16px 16px;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  scroll-behavior: smooth;
+}
+
+.wa-chat-thread::-webkit-scrollbar {
   width: 4px;
 }
-.console-body::-webkit-scrollbar-thumb {
+.wa-chat-thread::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 2px;
 }
 
-.console-message {
-  padding: 0.75rem 0.95rem;
+/* WhatsApp System Pill */
+.wa-system-pill {
+  align-self: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  font-weight: 500;
+  padding: 2px 10px;
   border-radius: var(--radius-xs);
+  margin: 0.25rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* WhatsApp Message Bubbles - Minimalist Monochrome Industrial */
+.wa-bubble {
+  max-width: 86%;
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--radius-sm);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  word-break: break-word;
+}
+
+/* AI Bubble (Incoming) */
+.wa-bubble-ai {
+  align-self: flex-start;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-top-left-radius: var(--radius-xs);
   border: 1px solid var(--border-subtle);
 }
 
-.console-message.assistant,
-.console-message.ai-bubble {
-  background: var(--bg-surface);
-  border-color: var(--border-subtle);
-  color: #e4e4e7;
-}
-
-.console-message.user,
-.console-message.user-bubble {
-  background: var(--bg-surface-elevated);
-  border-color: var(--border-strong);
+/* User Bubble (Outgoing - Monochrome!) */
+.wa-bubble-user {
+  align-self: flex-end;
+  background: var(--bg-subtle);
   color: var(--text-primary);
-  margin-left: 1.5rem;
+  border-top-right-radius: var(--radius-xs);
+  border: 1px solid var(--border-strong);
 }
 
-.msg-meta {
+/* Typing Indicator (Animated Dots) */
+.wa-typing-bubble {
+  min-width: 70px;
+  max-width: 90px;
+}
+
+.wa-typing-indicator {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.35rem;
-  font-size: 0.65rem;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 4px;
 }
 
-.msg-author {
-  font-weight: 600;
+.wa-typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: wa-typing-bounce 1.4s infinite ease-in-out both;
+}
+
+.wa-typing-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.wa-typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.wa-typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes wa-typing-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.wa-sender-tag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+}
+
+.wa-sender-name {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   color: var(--text-secondary);
 }
 
-.msg-timestamp {
+.wa-bubble-user .wa-sender-name {
+  color: var(--text-primary);
+}
+
+.wa-model-badge {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+}
+
+.wa-message-text {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.wa-message-text strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.wa-message-text code {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  background: var(--bg-canvas);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.wa-msg-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-top: 2px;
+}
+
+.wa-time {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
   color: var(--text-muted);
 }
 
+.wa-bubble-user .wa-time {
+  color: var(--text-muted);
+}
+
+.wa-ticks {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: -2px;
+}
+
+/* User Attached Image inside chat bubble */
+.chat-msg-img {
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: var(--radius-xs);
+  margin-bottom: 0.35rem;
+  border: 1px solid var(--border-subtle);
+  display: block;
+}
+
+/* Attached Image Preview Bar (above input) */
+.attached-image-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.attached-thumb-wrap {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  flex-shrink: 0;
+}
+
+.attached-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.btn-remove-attachment {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #ffffff;
+  border: 1px solid var(--border-subtle);
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-xs);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.attached-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.attached-name {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.attached-hint {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Quick Action Prompt Chips */
 .prompt-shortcuts {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  padding: 0.65rem 1.25rem;
+  padding: 0.65rem 1rem;
   background: var(--bg-surface);
   border-top: 1px solid var(--border-subtle);
 }
@@ -578,65 +861,97 @@ body {
   color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xs);
-  padding: 0.35rem 0.6rem;
+  padding: 0.4rem 0.65rem;
   font-family: var(--font-mono);
   font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   cursor: pointer;
   transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .shortcut-chip:hover {
   background: var(--text-primary);
   color: var(--bg-canvas);
   border-color: var(--text-primary);
+  transform: translateY(-1px);
 }
 
-.console-input-bar {
+/* WhatsApp Input Form */
+.wa-input-form {
   display: flex;
   align-items: center;
-  border-top: 1px solid var(--border-subtle);
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
   background: var(--bg-surface-elevated);
+  border-top: 1px solid var(--border-subtle);
 }
 
-.input-prefix {
-  padding-left: 1.1rem;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-.console-input-bar input {
-  flex: 1;
+.btn-attach {
   background: transparent;
-  border: none;
-  padding: 0.85rem 0.85rem;
-  color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  outline: none;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
-.console-input-bar input::placeholder {
+.btn-attach:hover {
+  color: var(--text-primary);
+  background: var(--bg-subtle);
+  border-color: var(--border-focus);
+}
+
+.wa-input-form input {
+  flex: 1;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: 0.65rem 0.85rem;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  outline: none;
+  min-height: 38px;
+  transition: border-color 0.15s ease;
+}
+
+.wa-input-form input:focus {
+  border-color: var(--border-focus);
+}
+
+.wa-input-form input::placeholder {
   color: var(--text-muted);
 }
 
-.console-input-bar button {
+.btn-send-wa {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-xs);
   background: var(--text-primary);
   color: var(--bg-canvas);
   border: none;
-  padding: 0.55rem 1.1rem;
-  margin-right: 0.65rem;
-  border-radius: var(--radius-xs);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
-.console-input-bar button:hover {
-  opacity: 0.85;
+.btn-send-wa:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15);
 }
 
 /* ==========================================================
@@ -1267,7 +1582,75 @@ body {
 }
 
 /* ==========================================================
-   Responsive Adaptations (Mobile & Tablet)
+   Mobile Bottom Navigation Bar
+   ========================================================== */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #111114;
+  border-top: 1px solid var(--border-subtle);
+  z-index: 1000;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 0.5rem;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  padding: 0.35rem 0;
+  transition: all 0.15s ease;
+  height: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-item .nav-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-item .nav-label {
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+.nav-item.active {
+  color: var(--text-primary);
+}
+
+.nav-item[data-tab="copilot"].active {
+  color: var(--text-primary);
+}
+
+.nav-dot-badge {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  background: var(--text-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(250, 250, 250, 0.6);
+}
+
+/* ==========================================================
+   Responsive Adaptations (Mobile-First Preference)
    ========================================================== */
 @media (max-width: 1180px) {
   .instruments-grid {
@@ -1279,111 +1662,174 @@ body {
 }
 
 @media (max-width: 768px) {
+  body {
+    padding-bottom: 68px; /* space for mobile bottom bar */
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+  }
+
   .app-header {
-    padding: 0.85rem 1rem;
+    padding: 0.65rem 0.85rem;
     flex-direction: column;
     align-items: stretch;
-    gap: 0.85rem;
+    gap: 0.65rem;
   }
 
   .brand-group {
     justify-content: flex-start;
   }
 
+  .brand-title {
+    font-size: 0.95rem;
+  }
+
+  .brand-subtitle {
+    display: none; /* Keep header compact on mobile */
+  }
+
   .header-controls {
     flex-direction: column;
     align-items: stretch;
     width: 100%;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   .selector-container {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.35rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
     width: 100%;
+  }
+
+  .select-wrapper {
+    flex: 1;
   }
 
   .mono-select {
     width: 100%;
-    font-size: 0.8rem;
-    padding: 0.6rem 2rem 0.6rem 0.75rem;
+    font-size: 0.78rem;
+    padding: 0.45rem 1.8rem 0.45rem 0.65rem;
   }
 
   .status-group {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.35rem;
     width: 100%;
   }
 
   .status-item {
     flex: 1 1 auto;
-    font-size: 0.68rem;
-    padding: 0.35rem 0.5rem;
+    font-size: 0.65rem;
+    padding: 0.25rem 0.4rem;
     justify-content: center;
   }
 
   .dashboard-shell {
-    padding: 0.85rem;
-    gap: 1rem;
-  }
-
-  .instruments-grid {
-    grid-template-columns: repeat(2, 1fr);
+    padding: 0.65rem;
     gap: 0.75rem;
   }
 
-  .instrument-card {
-    padding: 0.95rem 1rem;
+  /* ---------------------------------------------------------
+     Mobile Tab Visibility Rules
+     --------------------------------------------------------- */
+  .tab-section {
+    display: none !important;
   }
 
-  .metric-number {
-    font-size: 1.85rem;
+  body[data-active-tab="telemetry"] .tab-section[data-tab-content="telemetry"] {
+    display: grid !important;
   }
 
-  .canvas-wrapper {
-    height: 200px;
-    padding: 0.75rem 0.5rem 0.5rem 0.5rem;
-    touch-action: pan-y;
+  body[data-active-tab="copilot"] .tab-section[data-tab-content="copilot"] {
+    display: flex !important;
   }
 
-  .panel-topbar {
-    padding: 0.75rem 1rem;
+  body[data-active-tab="waveforms"] .tab-section[data-tab-content="waveforms"] {
+    display: flex !important;
+  }
+
+  body[data-active-tab="alerts"] .tab-section[data-tab-content="alerts"] {
+    display: flex !important;
+  }
+
+  /* ---------------------------------------------------------
+     Mobile WhatsApp Copilot Full-Screen Experience
+     --------------------------------------------------------- */
+  body[data-active-tab="copilot"] .analytics-layout {
+    display: block;
+    margin: 0;
+  }
+
+  body[data-active-tab="copilot"] .diagnostics-column {
+    width: 100%;
+    margin: 0;
+  }
+
+  body[data-active-tab="copilot"] .console-panel {
+    height: calc(100vh - 150px);
+    display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
+    border-radius: var(--radius-sm);
   }
 
-  .spectrum-legend {
-    flex-wrap: wrap;
-  }
-
-  .console-body {
-    height: 210px;
-    padding: 0.75rem 1rem;
-    font-size: 0.74rem;
+  body[data-active-tab="copilot"] .wa-chat-thread {
+    flex: 1;
+    height: auto;
+    max-height: none;
+    padding: 0.85rem 0.75rem;
   }
 
   .prompt-shortcuts {
-    padding: 0.5rem 0.75rem;
-    gap: 0.35rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.5rem 0.65rem;
+    gap: 0.4rem;
   }
 
   .shortcut-chip {
-    padding: 0.3rem 0.5rem;
-    font-size: 0.62rem;
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.68rem;
   }
 
-  .console-input-bar button {
-    padding: 0.65rem 1rem;
+  .wa-input-form {
+    padding: 0.5rem;
+  }
+
+  .wa-input-form input {
+    font-size: 0.88rem;
+    padding: 0.55rem 0.75rem;
+  }
+
+  /* Telemetry instruments on mobile */
+  .instruments-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .instrument-card {
+    padding: 0.85rem 1rem;
+  }
+
+  .metric-number {
+    font-size: 2rem;
+  }
+
+  .canvas-wrapper {
+    height: 220px;
+    padding: 0.75rem 0.5rem;
+    touch-action: pan-y;
   }
 
   .wa-integration-bar {
     flex-direction: column;
     align-items: stretch;
-    gap: 1rem;
-    padding: 1rem;
+    gap: 0.85rem;
+    padding: 0.85rem;
   }
 
   .btn-terminal {
@@ -1393,23 +1839,18 @@ body {
   }
 
   .modal-window {
-    max-width: calc(100vw - 1.5rem);
+    max-width: calc(100vw - 1rem);
     margin: 0 auto;
   }
 
   .modal-content {
-    padding: 1rem;
-  }
-
-  .command-block code {
-    font-size: 0.75rem;
-    word-break: break-all;
+    padding: 0.85rem;
   }
 }
 
-@media (max-width: 520px) {
-  .instruments-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 480px) {
+  .metric-number {
+    font-size: 1.85rem;
   }
 
   .control-actions {

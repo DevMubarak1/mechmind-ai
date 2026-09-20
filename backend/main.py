@@ -70,15 +70,10 @@ def get_whisper():
             import importlib
             fw = importlib.import_module("faster_whisper")
             whisper_cls = getattr(fw, "WhisperModel")
-            try:
-                whisper_model = whisper_cls("base", device="cuda", compute_type="float16")
-                logger.info("Whisper model loaded (base, CUDA)")
-            except Exception as cuda_err:
-                logger.warning(f"CUDA initialization failed ({cuda_err}), falling back to CPU...")
-                whisper_model = whisper_cls("base", device="cpu", compute_type="int8")
-                logger.info("Whisper model loaded (base, CPU)")
-        except (ImportError, ModuleNotFoundError):
-            logger.warning("faster_whisper not installed. Voice transcription fallback enabled.")
+            whisper_model = whisper_cls("base", device="cpu", compute_type="int8")
+            logger.info("Whisper model loaded (base, CPU int8)")
+        except Exception as e:
+            logger.warning(f"faster_whisper initialization error ({e}). Voice transcription fallback enabled.")
             whisper_model = None
     return whisper_model
 
@@ -278,22 +273,44 @@ from rag_engine import diagnose_with_rag
 async def diagnose(query: DiagnosticQuery):
     """AI diagnostic endpoint — called by WhatsApp bot and web dashboard"""
     
-    # Get recent sensor data for context
-    sensor_context = ""
+    # Gather comprehensive dashboard statistics, fleet status, and live sensor readings
     with SessionLocal() as db:
+        # Fleet and Active Asset Summary
+        eq_rows = db.execute(text("SELECT id, name, type, model, location, status, node_id FROM equipment ORDER BY id")).fetchall()
+        fleet_items = [f"{r[1]} ({r[2].title()}, Model {r[3]}, Node {r[6]}, Location: {r[4]}, Status: {r[5].title()})" for r in eq_rows]
+        fleet_summary = "; ".join(fleet_items)
+        
+        # Real-time System Statistics
+        total_equipment = len(eq_rows)
+        readings_today = db.execute(text("SELECT COUNT(*) FROM sensor_readings WHERE timestamp > CURRENT_DATE")).scalar() or 0
+        active_alerts_count = db.execute(text("SELECT COUNT(*) FROM alerts WHERE acknowledged = FALSE AND created_at > NOW() - INTERVAL '24 hours'")).scalar() or 0
+        diagnostics_today = db.execute(text("SELECT COUNT(*) FROM diagnostic_sessions WHERE created_at > CURRENT_DATE")).scalar() or 0
+
+        # Identify target equipment
+        active_name = "Unknown Asset"
+        for r in eq_rows:
+            if r[0] == query.equipment_id:
+                active_name = f"{r[1]} (Model {r[3]}, Node {r[6]}, Status: {r[5].title()})"
+                break
+
+        # Recent sensor readings for active asset
+        readings_text = ""
         if query.equipment_id:
             readings = db.execute(text("""
-                SELECT temperature, vibration_magnitude, sound_level_db, timestamp
+                SELECT temperature, vibration_magnitude, sound_level_db, vibration_x, vibration_y, vibration_z, timestamp
                 FROM sensor_readings WHERE equipment_id = :eq_id
                 ORDER BY timestamp DESC LIMIT 5
             """), {"eq_id": query.equipment_id}).fetchall()
             
             if readings:
-                sensor_context = "Recent equipment sensor readings:\n"
-                for temp, vib, sound, ts in readings:
-                    sensor_context += f"- {ts}: Temp={temp}°C, Vibration={vib}g, Sound={sound}dB\n"
-        
-        # Get recent alerts
+                readings_lines = []
+                for temp, vmag, sound, vx, vy, vz, ts in readings:
+                    ts_str = ts.strftime('%H:%M:%S') if hasattr(ts, 'strftime') else str(ts)
+                    readings_lines.append(f"- [{ts_str}] Temp={temp}°C, Vibration={vmag}g (X={vx}, Y={vy}, Z={vz}), Sound={sound}dB")
+                readings_text = "\n".join(readings_lines)
+
+        # Recent active alerts
+        alerts_text = ""
         alerts = db.execute(text("""
             SELECT severity, message, created_at FROM alerts
             WHERE equipment_id = :eq_id AND created_at > :since
@@ -301,13 +318,51 @@ async def diagnose(query: DiagnosticQuery):
         """), {"eq_id": query.equipment_id or 0, "since": datetime.now() - timedelta(hours=24)}).fetchall()
         
         if alerts:
-            sensor_context += "\nRecent alerts:\n"
+            alerts_lines = []
             for sev, msg, ts in alerts:
-                sensor_context += f"- [{sev}] {msg}\n"
-    
-    # Call the production RAG engine (ChromaDB + llama3.1:8b + Safety Guardrails)
-    logger.info(f"Running RAG diagnosis for query: '{query.message[:60]}...'")
-    ai_response = diagnose_with_rag(query_text=query.message, sensor_context=sensor_context.strip())
+                ts_str = ts.strftime('%H:%M:%S') if hasattr(ts, 'strftime') else str(ts)
+                alerts_lines.append(f"- [{sev.upper()}] {msg} ({ts_str})")
+            alerts_text = "\n".join(alerts_lines)
+
+        # Multi-turn conversation memory: retrieve previous interactions for this phone number
+        conversation_history = ""
+        recent_sessions = db.execute(text("""
+            SELECT query_type, user_message, ai_response
+            FROM diagnostic_sessions
+            WHERE phone_number = :phone
+            ORDER BY created_at DESC LIMIT 4
+        """), {"phone": query.phone_number}).fetchall()
+
+        if recent_sessions:
+            history_entries = []
+            for qtype, u_msg, a_resp in reversed(recent_sessions):
+                tag = f"[{qtype.upper()}] " if qtype != "text" else ""
+                clean_resp = a_resp[:350].strip() if a_resp else ""
+                history_entries.append(f"Operator: {tag}{u_msg}\nMechMind: {clean_resp}")
+            conversation_history = "\n\n".join(history_entries)
+
+        # Assemble full live dashboard context
+        dashboard_context = f"""[LIVE DASHBOARD & FLEET METRICS]
+- Active Inspected Asset: {active_name}
+- Total Fleet Assets Monitored: {total_equipment} machines ({fleet_summary})
+- Total Sensor Readings Ingested Today: {readings_today} data points
+- Active System Alerts (Past 24 Hours): {active_alerts_count} active
+- AI Diagnostics Handled Today: {diagnostics_today} sessions
+"""
+        if readings_text:
+            dashboard_context += f"\n[LATEST PHYSICAL SENSOR TELEMETRY - NODE-001]\n{readings_text}\n"
+        if alerts_text:
+            dashboard_context += f"\n[RECENT ALERTS]\n{alerts_text}\n"
+        else:
+            dashboard_context += "\n[RECENT ALERTS]\nNo unacknowledged critical alerts in past 24 hours.\n"
+
+    # Call the production RAG engine (ChromaDB + llama3.1:8b + Safety Guardrails + Multi-Turn Memory)
+    logger.info(f"Running RAG diagnosis for query: '{query.message[:60]}...' (has_history: {bool(conversation_history)})")
+    ai_response = diagnose_with_rag(
+        query_text=query.message, 
+        sensor_context=dashboard_context.strip(),
+        conversation_history=conversation_history.strip()
+    )
     
     if not ai_response:
         ai_response = "Diagnostic service temporarily unavailable. Please verify local Ollama llama3.1:8b status."
@@ -325,7 +380,7 @@ async def diagnose(query: DiagnosticQuery):
         })
         db.commit()
     
-    return {"response": ai_response, "sensor_context": bool(sensor_context)}
+    return {"response": ai_response, "sensor_context": bool(dashboard_context)}
 
 
 @app.post("/api/transcribe")
@@ -404,7 +459,7 @@ async def diagnose_image(file: UploadFile = File(...), phone_number: str = Form(
     try:
         models_data = ollama.list()
         avail_models = [getattr(m, 'model', getattr(m, 'name', str(m))) for m in getattr(models_data, 'models', [])]
-        vision_model = next((m for m in avail_models if "vision" in m or "llava" in m), None)
+        vision_model = next((m for m in avail_models if any(k in m.lower() for k in ["vision", "llava", "moondream"])), None)
 
         if vision_model:
             res = ollama.chat(
@@ -464,13 +519,20 @@ async def get_equipment():
 
 @app.get("/api/equipment/{equipment_id}/readings")
 async def get_readings(equipment_id: int, limit: int = 50):
-    """Get sensor readings for an equipment"""
+    """Get sensor readings for an equipment (falls back to active fleet stream if specific asset has no dedicated sensor yet)"""
     with SessionLocal() as db:
         rows = db.execute(text("""
             SELECT temperature, vibration_x, vibration_y, vibration_z, vibration_magnitude, sound_level_db, timestamp
             FROM sensor_readings WHERE equipment_id = :id
             ORDER BY timestamp DESC LIMIT :lim
         """), {"id": equipment_id, "lim": limit}).fetchall()
+        
+        if not rows:
+            rows = db.execute(text("""
+                SELECT temperature, vibration_x, vibration_y, vibration_z, vibration_magnitude, sound_level_db, timestamp
+                FROM sensor_readings
+                ORDER BY timestamp DESC LIMIT :lim
+            """), {"lim": limit}).fetchall()
         
         return [{"temperature": r[0], "vibration_x": r[1], "vibration_y": r[2], "vibration_z": r[3], "vibration": r[4], "sound": r[5], "timestamp": r[6].isoformat()} for r in rows]
 

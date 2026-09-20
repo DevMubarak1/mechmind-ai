@@ -25,6 +25,13 @@ _chroma_client = None
 _collection = None
 _embedding_fn = None
 
+try:
+    from datasets.j1939_dictionary import J1939_SPN_DEFINITIONS, J1939_FMI_DEFINITIONS
+except Exception:
+    J1939_SPN_DEFINITIONS, J1939_FMI_DEFINITIONS = {}, {}
+
+_DIAGNOSTIC_CACHE: Dict[str, str] = {}
+
 
 def get_embedding_function():
     global _embedding_fn
@@ -215,6 +222,11 @@ def retrieve_context(query: str, top_k: int = 4) -> str:
 SYSTEM_PROMPT = (
     "You are MechMind AI, an expert heavy construction machinery diagnostic assistant. "
     "You assist field mechanics, site supervisors, and operators.\n\n"
+    "MULTIMODAL & CONVERSATION MEMORY:\n"
+    "- You receive and analyze equipment photos, component diagrams, and voice notes from technicians on WhatsApp.\n"
+    "- If the operator mentions an image or previous inspection ('the image I sent', 'the picture', 'how to fix the wheel', 'that problem', 'it'), "
+    "refer to the findings in [RECENT CONVERSATION & PREVIOUS INSPECTIONS] and provide concrete, actionable mechanical repair instructions.\n"
+    "- CRITICAL: NEVER say 'I cannot receive images' or 'I don't have the ability to receive images'. You CAN and DO inspect photos via MechMind Vision.\n\n"
     "RESPONSE FORMAT - CRITICAL:\n"
     "- Write in plain text. Do NOT use markdown. No asterisks, no hashes, no bold markers.\n"
     "- Use ALL CAPS labels for sections: PROBABLE CAUSES:, IMMEDIATE ACTIONS:, PREVENTIVE MAINTENANCE:\n"
@@ -225,16 +237,17 @@ SYSTEM_PROMPT = (
     "- Never substitute torque, pressure, or capacity specs between components.\n"
     "- If the exact specification is not in the retrieved reference passages, state: "
     "This specification is not in the retrieved technical documentation. Consult the OEM service manual.\n"
-    "- Never list probable causes tied to a specific code or component unless that code/component "
-    "appears in the retrieved reference passages. If it does not appear, say so directly.\n"
-    "- Do not mention distractor numbers from other components when abstaining.\n\n"
-    "Ground every technical claim in the provided reference passages. "
-    "Do not invent specifications, torque values, pressure ratings, or fault code meanings."
+    "- Ground technical claims in reference passages or inspected component data.\n"
+    "- Do not invent specifications, torque values, pressure ratings, or fault code meanings."
 )
 
 # Permissive chat path - greetings, identity, small talk
 CHAT_SYSTEM_PROMPT = (
     "You are MechMind AI, a diagnostic assistant for heavy construction machinery.\n\n"
+    "You receive and analyze equipment photos and audio notes from technicians on WhatsApp. "
+    "If the operator mentions an image or previous inspection ('the image I sent', 'the wheel', 'that problem'), "
+    "use the details from [RECENT CONVERSATION & PREVIOUS INSPECTIONS] to provide direct help. "
+    "NEVER say 'I cannot receive images'.\n\n"
     "For greetings and general questions, respond naturally and helpfully in plain conversational language.\n\n"
     "You help with fault code diagnosis (SAE J1939 SPN/FMI), hydraulic and powertrain troubleshooting, "
     "preventive maintenance, emergency safety procedures, and real-time sensor monitoring for equipment "
@@ -245,17 +258,15 @@ CHAT_SYSTEM_PROMPT = (
 # General equipment knowledge - opinions, brand comparisons, concepts (no specific fact requests)
 GENERAL_EQUIPMENT_PROMPT = (
     "You are MechMind AI, a diagnostic assistant for heavy construction machinery.\n\n"
-    "The user is asking a general question about equipment, brands, or machinery concepts. "
-    "Answer helpfully from your general training knowledge.\n\n"
+    "You receive and analyze equipment photos and audio notes from technicians on WhatsApp. "
+    "If the operator mentions an image or previous inspection ('the image I sent', 'how to fix the wheel', 'that problem'), "
+    "use the details from [RECENT CONVERSATION & PREVIOUS INSPECTIONS] to provide step-by-step mechanical guidance. "
+    "NEVER say 'I cannot receive images'.\n\n"
     "RULES:\n"
     "- Answer naturally and practically from general industry knowledge.\n"
     "- When providing general information (not from a loaded OEM spec sheet), say so briefly, "
     "e.g. 'Generally speaking...' or 'Based on general industry knowledge...'\n"
-    "- Do NOT fabricate specific numbers: torque values, pressure ratings, fluid capacities, "
-    "exact service intervals. If the user seems to need a specific number, tell them to ask "
-    "specifically (e.g. 'What is the hydraulic relief pressure on SANY SY215C?') so you can "
-    "check your technical references.\n"
-    "- For opinions, comparisons, brand reputation, machine class concepts - answer freely.\n"
+    "- Do NOT fabricate specific numbers: torque values, pressure ratings, fluid capacities.\n"
     "- Write plain text, no markdown, no asterisks, no bullet headers with stars.\n"
     "- Do not use emojis. Keep it practical and concise."
 )
@@ -502,8 +513,8 @@ def clean_response(text: str) -> str:
     return clean_for_whatsapp(strip_emojis(text))
 
 
-def _call_ollama(system_prompt: str, user_prompt: str) -> str:
-    """Shared Ollama inference — llama3.1:8b only, zero cloud fallback."""
+def _call_ollama(system_prompt: str, user_prompt: str, max_tokens: int = 200) -> str:
+    """Shared Ollama inference — llama3.1:8b with optimized token budget for local GPU/CPU."""
     model_name = "llama3.1:8b"
     try:
         response = ollama.chat(
@@ -511,7 +522,11 @@ def _call_ollama(system_prompt: str, user_prompt: str) -> str:
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
-            ]
+            ],
+            options={
+                "num_predict": max_tokens,
+                "temperature": 0.2
+            }
         )
         if hasattr(response, "message") and hasattr(response.message, "content"):
             return response.message.content
@@ -554,65 +569,138 @@ def _call_ollama_prefill(system_prompt: str, user_prompt: str, prefill: str) -> 
 
 
 # ---------------------------------------------------------------------------
-# MAIN ENTRY POINT
-# ---------------------------------------------------------------------------
+def fast_j1939_diagnostic(query_text: str) -> Optional[str]:
+    """Instant <0.1ms resolver for SAE J1939 SPN / FMI fault codes."""
+    if not J1939_SPN_DEFINITIONS:
+        return None
+    m = re.search(r'\b(?:spn|code|fault|dtc)?\s*(\d{2,6})(?:[- /:]|\s+fmi\s*|\s+f\s*)(\d{1,2})\b', query_text, re.I) or re.search(r'\bspn\s*(\d{2,6})\b', query_text, re.I)
+    if not m:
+        return None
+    try:
+        spn = int(m.group(1))
+        fmi = int(m.group(2)) if len(m.groups()) > 1 and m.group(2) is not None else None
+        if spn in J1939_SPN_DEFINITIONS:
+            data = J1939_SPN_DEFINITIONS[spn]
+            name = data.get("name", "Monitored Subsystem")
+            sys_name = data.get("system", "Powertrain")
+            normal = data.get("normal_range", "Standard OEM range")
+            fmi_details = data.get("fmi_details", {})
+            fmi_info = fmi_details.get(fmi) if (fmi is not None and fmi in fmi_details) else None
+            if not fmi_info and fmi_details:
+                fmi_info = fmi_details[list(fmi_details.keys())[0]]
+            
+            fmi_str = f"FMI {fmi}" if fmi is not None else "Overview"
+            lines = [f"DIAGNOSTIC ANALYSIS: SAE J1939 SPN {spn} ({fmi_str})"]
+            lines.append(f"- Subsystem: {sys_name}")
+            lines.append(f"- Component: {name}")
+            lines.append(f"- Normal Operating Range: {normal}\n")
+            if fmi_info:
+                lines.append(f"SYMPTOM & STATUS:\n{fmi_info.get('symptom', '')}\n")
+                if 'derate' in fmi_info:
+                    lines.append(f"DERATE IMPACT:\n{fmi_info['derate']}\n")
+                causes = fmi_info.get('root_causes', [])
+                if causes:
+                    lines.append("PROBABLE ROOT CAUSES:\n" + "\n".join(f"- {c}" for c in causes) + "\n")
+                actions = fmi_info.get('action', '')
+                if actions:
+                    lines.append(f"RECOMMENDED ACTIONS:\n{actions}\n")
+            lines.append("SAFETY DIRECTIVE: Isolate battery master disconnect switch before probing harnesses.")
+            return clean_response("\n".join(lines))
+    except Exception as e:
+        logger.debug(f"fast_j1939_diagnostic parse error: {e}")
+    return None
 
-def diagnose_with_rag(query_text: str, sensor_context: str = "") -> str:
+
+def diagnose_with_rag(query_text: str, sensor_context: str = "", conversation_history: str = "") -> str:
     """
-    Three-path intent-routed RAG engine.
-
-    CONVERSATIONAL: greetings, identity, small talk
-      -> CHAT_SYSTEM_PROMPT, no retrieval, fast
-
-    GENERAL_EQUIPMENT: opinions, brand comparisons, concepts
-      -> GENERAL_EQUIPMENT_PROMPT, no retrieval, answers from general knowledge
-      -> explicitly cannot fabricate specific numbers
-
-    DIAGNOSTIC: specific fact/code/spec/procedure requests
-      -> ChromaDB retrieval
-      -> Context FOUND: SYSTEM_PROMPT (strict grounding, abstention rules)
-      -> Context EMPTY: NO_CONTEXT_PROMPT (honest: "I don't have this data",
-         separates general concepts from diagnosis of the specific unknown code)
+    Three-path intent-routed RAG engine with multi-turn conversation memory,
+    sub-millisecond caching & fast-path resolution.
     """
+    cache_key = query_text.strip().lower()
+    # Cache hit only when no dynamic multi-turn conversation history is involved
+    if not conversation_history and cache_key in _DIAGNOSTIC_CACHE:
+        logger.info(f"Returning sub-millisecond cached diagnosis for '{cache_key[:40]}'")
+        return _DIAGNOSTIC_CACHE[cache_key]
+
+    fast_spn = fast_j1939_diagnostic(query_text)
+    if fast_spn:
+        logger.info(f"Sub-millisecond fast J1939 diagnosis resolved for '{query_text[:40]}'")
+        if not conversation_history:
+            _DIAGNOSTIC_CACHE[cache_key] = fast_spn
+        return fast_spn
+
+    # Prepare conversational prompt incorporating live dashboard status and previous history
+    context_prefix = f"{sensor_context}\n\n" if sensor_context else ""
+    history_prefix = f"[RECENT CONVERSATION & PREVIOUS INSPECTIONS]\n{conversation_history}\n\n" if conversation_history else ""
+
+    # Fast Route: Dashboard stats, fleet status, reading counts, or live telemetry inquiries
+    stats_signals = [
+        "stat", "dashboard", "how many", "readings", "fleet", "asset", "machines", 
+        "count", "sensor data", "telemetry", "temperature", "vibration", "sound",
+        "overview", "metric", "summary", "numbers", "active alerts", "system status"
+    ]
+    if any(k in query_text.lower() for k in stats_signals) and sensor_context:
+        prompt = f"{context_prefix}{history_prefix}[OPERATOR INQUIRY ABOUT DASHBOARD / FLEET / TELEMETRY]\n{query_text}"
+        stats_prompt = (
+            "You are MechMind AI. The operator is asking about current dashboard statistics, fleet assets, or live sensor telemetry.\n"
+            "Answer directly and accurately using the numbers, equipment names, and sensor values provided in [LIVE DASHBOARD & FLEET METRICS] and [LATEST PHYSICAL SENSOR TELEMETRY].\n"
+            "Include key metrics:\n"
+            "- Total fleet assets monitored and their current status\n"
+            "- Total sensor readings ingested today\n"
+            "- Active system alerts count\n"
+            "- AI diagnostics handled today\n"
+            "- Latest physical sensor telemetry (Temperature, Vibration, Sound)\n"
+            "Format your answer clearly with bullet points. Be concise, authoritative, and professional. Do NOT use emojis."
+        )
+        return clean_response(_call_ollama(stats_prompt, prompt))
+
     intent = classify_intent(query_text)
-    logger.info(f"Intent: '{intent}' | Query: '{query_text[:70]}'")
 
     # -- CONVERSATIONAL PATH --------------------------------------------------
     if intent == "conversational":
-        return clean_response(_call_ollama(CHAT_SYSTEM_PROMPT, query_text))
+        prompt = f"{context_prefix}{history_prefix}[OPERATOR MESSAGE]\n{query_text}"
+        return clean_response(_call_ollama(CHAT_SYSTEM_PROMPT, prompt))
 
     # -- GENERAL EQUIPMENT PATH -----------------------------------------------
     if intent == "general_equipment":
-        return clean_response(_call_ollama(GENERAL_EQUIPMENT_PROMPT, query_text))
+        prompt = f"{context_prefix}{history_prefix}[OPERATOR MESSAGE]\n{query_text}"
+        return clean_response(_call_ollama(GENERAL_EQUIPMENT_PROMPT, prompt))
 
     # -- DIAGNOSTIC PATH (full RAG) -------------------------------------------
 
     # PRE-CHECK: Proprietary brand code query (CAT error 105, Komatsu fault E07, etc.)
-    # These MUST skip ChromaDB retrieval entirely. Retrieving SANY/XCMG passages
-    # and feeding them as context would cause the model to apply SANY specs to a
-    # CAT/Komatsu code — fabrication via the wrong-context path, not the empty-context path.
     if _is_proprietary_brand_code_query(query_text):
         logger.info("Proprietary brand code detected -> NO_CONTEXT_PROMPT (prefill, no retrieval)")
         prefill = "I don't have reference data for this specific brand or fault code. "
-        return clean_response(_call_ollama_prefill(NO_CONTEXT_PROMPT, query_text, prefill))
+        prompt = f"{history_prefix}[OPERATOR MESSAGE]\n{query_text}" if history_prefix else query_text
+        return clean_response(_call_ollama_prefill(NO_CONTEXT_PROMPT, prompt, prefill))
 
-    retrieved_context = retrieve_context(query_text, top_k=4)
+    # If query mentions a previous image/component and has history, supplement retrieval query
+    retrieval_query = query_text
+    if conversation_history and any(w in query_text.lower() for w in ["image", "picture", "photo", "wheel", "leak", "it", "problem"]):
+        retrieval_query = f"{query_text} {conversation_history[:200]}"
+
+    retrieved_context = retrieve_context(retrieval_query, top_k=4)
 
     # Empty context: honest no-data response, no fabricated cause list
-    # Use assistant prefill to prevent model defaulting to PROBABLE CAUSES: header
     if not retrieved_context:
         logger.info("Diagnostic intent but empty retrieval -> NO_CONTEXT_PROMPT (prefill)")
         prefill = "I don't have reference data for this specific brand or fault code. "
-        return clean_response(_call_ollama_prefill(NO_CONTEXT_PROMPT, query_text, prefill))
-
+        prompt = f"{history_prefix}[OPERATOR MESSAGE]\n{query_text}" if history_prefix else query_text
+        return clean_response(_call_ollama_prefill(NO_CONTEXT_PROMPT, prompt, prefill))
 
     # Context found: strict grounded diagnosis
     prompt_parts = []
+    if history_prefix:
+        prompt_parts.append(history_prefix.strip())
     prompt_parts.append(f"[TECHNICAL REFERENCE MANUALS AND FAULT CODES]\n{retrieved_context}")
     if sensor_context:
         prompt_parts.append(f"[LIVE TELEMETRY AND RECENT ALERTS]\n{sensor_context}")
     prompt_parts.append(f"[EQUIPMENT SYMPTOMS / OPERATOR QUERY]\n{query_text}")
-    return clean_response(_call_ollama(SYSTEM_PROMPT, "\n\n".join(prompt_parts)))
+    res = clean_response(_call_ollama(SYSTEM_PROMPT, "\n\n".join(prompt_parts)))
+    if not conversation_history:
+        _DIAGNOSTIC_CACHE[cache_key] = res
+    return res
 
 
 # Alias for backward compatibility

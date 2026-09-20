@@ -26,13 +26,20 @@ const vibMagData = [];
 const tempData = [];
 const soundData = [];
 
-// Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initCharts();
   setupEventListeners();
+  setupMobileTabs();
+  setupImageAttachment();
   checkSystemHealth();
   startRealDataPolling();
   fetchAlerts();
+
+  // Set initial time
+  const initTimeEl = document.getElementById('chatInitTime');
+  if (initTimeEl) {
+    initTimeEl.textContent = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+  }
 
   // Polling for health and alert updates
   setInterval(() => {
@@ -229,6 +236,12 @@ function pushTelemetry(temp, ax, ay, az, mag, sound, timestamp) {
 
   document.getElementById('axisReadout').textContent = `X: ${ax.toFixed(1)} · Y: ${ay.toFixed(1)} · Z: ${az.toFixed(1)}`;
   document.getElementById('lastUpdated').textContent = `UPDATED ${timeStr}`;
+
+  // Update Live Values in Copilot Header
+  const chatLiveTemp = document.getElementById('chatLiveTemp');
+  const chatLiveVib = document.getElementById('chatLiveVib');
+  if (chatLiveTemp) chatLiveTemp.textContent = `${temp.toFixed(1)}°C`;
+  if (chatLiveVib) chatLiveVib.textContent = `${mag.toFixed(2)}g`;
 
   // Temp Status Badges & Meters
   const tempBadge = document.getElementById('tempBadge');
@@ -435,26 +448,100 @@ function setupEventListeners() {
     await fetchRealTelemetry(true);
   });
 
-  // Quick Prompt Chips
+  // Quick Prompt Chips — send query immediately
   document.querySelectorAll('.quick-chip').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.getElementById('aiInput').value = btn.getAttribute('data-prompt');
+      const promptText = btn.getAttribute('data-prompt');
+      document.getElementById('aiInput').value = promptText;
       document.getElementById('aiChatForm').dispatchEvent(new Event('submit'));
     });
   });
 
-  // Diagnostic Chat Submission
+  // Reset Chat History Button
+  const btnReset = document.getElementById('btnResetChat');
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      const container = document.getElementById('chatContainer');
+      const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+      const currentTemp = document.getElementById('tempVal').textContent;
+      const currentVib = document.getElementById('vibVal').textContent;
+      container.innerHTML = `
+        <div class="wa-system-pill">
+          <span>CONVERSATION RESET · LIVE TELEMETRY ACTIVE</span>
+        </div>
+        <div class="wa-bubble wa-bubble-ai">
+          <div class="wa-sender-tag">
+            <span class="wa-sender-name">MECHMIND ENGINE</span>
+            <span class="wa-model-badge">LLAMA 3.1:8B</span>
+          </div>
+          <div class="wa-message-text">
+            Diagnostic session refreshed.<br><br>
+            • <strong>Temp:</strong> <span id="chatLiveTemp">${currentTemp}°C</span><br>
+            • <strong>Vibration:</strong> <span id="chatLiveVib">${currentVib}g</span><br><br>
+            Ask about live dashboard statistics, fleet metrics, fault codes, or attach a component photo for visual triage.
+          </div>
+          <div class="wa-msg-meta">
+            <span class="wa-time">${time}</span>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // Diagnostic Chat Submission (Supports Text & Photo Uploads)
   document.getElementById('aiChatForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = document.getElementById('aiInput');
     const msg = input.value.trim();
-    if (!msg) return;
+    
+    // Check if we have an attached photo or text
+    if (!msg && !currentAttachedFile) return;
 
     input.value = '';
-    appendMessage('OPERATOR', msg, 'user-bubble');
 
-    // Show processing indicator
-    const typingId = appendMessage('MECHMIND ENGINE', 'Consulting diagnostic database & telemetry logs...', 'ai-bubble');
+    // If an image was attached, submit via multimodal image diagnostic endpoint
+    if (currentAttachedFile) {
+      const fileToUpload = currentAttachedFile;
+      const dataUrlPreview = currentAttachedDataUrl;
+      const captionText = msg || 'Visual inspection of machinery component';
+
+      // Clear the attachment bar preview
+      const removeBtn = document.getElementById('btnRemoveAttachment');
+      if (removeBtn) removeBtn.click();
+
+      // Append user bubble with image thumbnail
+      appendWhatsAppMessage('OPERATOR', captionText, true, dataUrlPreview);
+
+      // Typing indicator (animated dots)
+      const typingId = showTypingIndicator();
+
+      try {
+        const formData = new FormData();
+        formData.append('file', fileToUpload);
+        formData.append('phone_number', '+2347010299562');
+        formData.append('caption', captionText);
+        formData.append('equipment_id', activeEquipmentId);
+
+        const res = await fetch(`${API_BASE}/api/diagnose/image`, {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        removeMessage(typingId);
+        appendWhatsAppMessage('MECHMIND ENGINE', data.response || data.analysis || 'Visual inspection complete.', false);
+      } catch (err) {
+        removeMessage(typingId);
+        appendWhatsAppMessage('MECHMIND ENGINE', 'Vision inference error. Verify local Ollama service is active.', false);
+      }
+      return;
+    }
+
+    // Text-only submission
+    appendWhatsAppMessage('OPERATOR', msg, true);
+
+    // Show typing indicator (animated dots — simulates natural typing)
+    const typingId = showTypingIndicator();
 
     try {
       const res = await fetch(`${API_BASE}/api/diagnose`, {
@@ -469,10 +556,10 @@ function setupEventListeners() {
 
       const data = await res.json();
       removeMessage(typingId);
-      appendMessage('MECHMIND ENGINE', data.response || 'No diagnostic output returned.', 'ai-bubble');
+      appendWhatsAppMessage('MECHMIND ENGINE', data.response || 'No diagnostic output returned.', false);
     } catch (err) {
       removeMessage(typingId);
-      appendMessage('MECHMIND ENGINE', 'Diagnostic API unreachable. Confirm FastAPI backend is active on port 8080.', 'ai-bubble');
+      appendWhatsAppMessage('MECHMIND ENGINE', 'Diagnostic API unreachable. Confirm FastAPI backend is active on port 8080.', false);
     }
   });
 
@@ -480,21 +567,159 @@ function setupEventListeners() {
   setupWhatsAppModal();
 }
 
-function appendMessage(sender, text, bubbleClass) {
+// Image Attachment Controller
+let currentAttachedFile = null;
+let currentAttachedDataUrl = null;
+
+function setupImageAttachment() {
+  const btnAttach = document.getElementById('btnAttachPhoto');
+  const fileInput = document.getElementById('aiImageInput');
+  const previewBar = document.getElementById('attachedImageBar');
+  const previewThumb = document.getElementById('attachedImageThumb');
+  const previewName = document.getElementById('attachedImageName');
+  const btnRemove = document.getElementById('btnRemoveAttachment');
+
+  if (btnAttach && fileInput) {
+    btnAttach.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      currentAttachedFile = file;
+      if (previewName) previewName.textContent = file.name;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        currentAttachedDataUrl = ev.target.result;
+        if (previewThumb) previewThumb.src = currentAttachedDataUrl;
+        if (previewBar) previewBar.style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (btnRemove) {
+    btnRemove.addEventListener('click', () => {
+      currentAttachedFile = null;
+      currentAttachedDataUrl = null;
+      if (fileInput) fileInput.value = '';
+      if (previewBar) previewBar.style.display = 'none';
+      if (previewThumb) previewThumb.src = '';
+    });
+  }
+}
+
+// Mobile Bottom Navigation Bar (Tab Switcher)
+function setupMobileTabs() {
+  const navItems = document.querySelectorAll('.mobile-bottom-nav .nav-item');
+  navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const targetTab = item.getAttribute('data-tab');
+      document.body.setAttribute('data-active-tab', targetTab);
+      navItems.forEach(i => i.classList.toggle('active', i === item));
+      
+      // Auto-scroll to top of newly selected tab
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Trigger chart resize if navigating to Waveforms tab
+      if (targetTab === 'waveforms') {
+        setTimeout(() => {
+          if (vibrationChart) vibrationChart.resize();
+          if (tempChart) tempChart.resize();
+        }, 100);
+      }
+    });
+  });
+}
+
+// Markdown Formatter for WhatsApp Messages
+function formatMarkdown(text) {
+  if (!text) return '';
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Bold **text**
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  
+  // Italic *text*
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  // Inline Code `code`
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  // Bullet Points
+  html = html.replace(/^[•\-\*]\s+(.*)$/gm, '• $1');
+
+  // Newlines
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+// Append WhatsApp Message Bubble
+// Show typing indicator with animated dots (simulates natural typing)
+function showTypingIndicator() {
   const container = document.getElementById('chatContainer');
   const div = document.createElement('div');
-  const id = 'msg-' + Date.now();
+  const id = 'typing-' + Date.now();
   div.id = id;
-  div.className = `console-message ${bubbleClass}`;
-  
-  const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+  div.className = 'wa-bubble wa-bubble-ai wa-typing-bubble';
   div.innerHTML = `
-    <div class="msg-meta">
-      <span class="msg-author">${sender.toUpperCase()}</span>
-      <span class="msg-timestamp">${time}</span>
+    <div class="wa-sender-tag">
+      <span class="wa-sender-name">MECHMIND ENGINE</span>
+      <span class="wa-model-badge">LLAMA 3.1:8B</span>
     </div>
-    <p>${text.replace(/\n/g, '<br>')}</p>
+    <div class="wa-typing-indicator">
+      <span class="wa-typing-dot"></span>
+      <span class="wa-typing-dot"></span>
+      <span class="wa-typing-dot"></span>
+    </div>
   `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return id;
+}
+
+function appendWhatsAppMessage(sender, text, isUser = false, imageUrl = null) {
+  const container = document.getElementById('chatContainer');
+  const div = document.createElement('div');
+  const id = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+  div.id = id;
+
+  const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+  if (isUser) {
+    div.className = 'wa-bubble wa-bubble-user';
+    let imageHtml = imageUrl ? `<img src="${imageUrl}" class="chat-msg-img" alt="Attached machinery photo">` : '';
+    div.innerHTML = `
+      <div class="wa-sender-tag">
+        <span class="wa-sender-name">OPERATOR</span>
+      </div>
+      ${imageHtml}
+      <div class="wa-message-text">${formatMarkdown(text)}</div>
+      <div class="wa-msg-meta">
+        <span class="wa-time">${time}</span>
+        <span class="wa-ticks">✓✓</span>
+      </div>
+    `;
+  } else {
+    div.className = 'wa-bubble wa-bubble-ai';
+    div.innerHTML = `
+      <div class="wa-sender-tag">
+        <span class="wa-sender-name">MECHMIND ENGINE</span>
+        <span class="wa-model-badge">LLAMA 3.1:8B</span>
+      </div>
+      <div class="wa-message-text">${formatMarkdown(text)}</div>
+      <div class="wa-msg-meta">
+        <span class="wa-time">${time}</span>
+      </div>
+    `;
+  }
+
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   return id;
