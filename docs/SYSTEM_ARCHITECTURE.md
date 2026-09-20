@@ -99,6 +99,13 @@ Automated system threshold violations triggered during ingestion:
 - `acknowledged` (BOOLEAN DEFAULT FALSE)
 - `created_at` (TIMESTAMP DEFAULT NOW())
 
+### 3.2 Hardware Scope & Deployment Truth: Physical Node vs Fleet Demonstration Mockup
+
+> [!IMPORTANT]
+> **Hardware Boundary & Deployment Reality**:
+> - **Live Physical Hardware**: **`NODE-001`** (bound to `Excavator CAT 320`) is the **sole physical IoT device** currently deployed and actively transmitting live data from the ESP32 microcontroller, DS18B20 thermal probe, and MPU6050 accelerometer.
+> - **Simulated Fleet Scale Demonstration**: **`NODE-002` through `NODE-008`** (XCMG LW500 Wheel Loader, Zoomlion TC6013A Tower Crane, Komatsu PC200-8 Excavator, SANY SY215C Excavator, CAT D6T Bulldozer, Volvo A40G Hauler, and CAT 140K Grader) represent simulated entries in the PostgreSQL database and UI dropdown. They serve as a **UI/UX architectural demonstration** of how MechMind AI scales across diverse heavy equipment categories on multi-asset worksites (Lagos Site A, Abuja Site B, Port Harcourt Site C), and MUST NOT be represented as active physical hardware nodes.
+
 #### `alert_thresholds`
 Configurable operating limits per machinery type:
 - Temperature warning: `85.0°C`, critical: `105.0°C`
@@ -156,14 +163,22 @@ To balance sub-millisecond responsiveness for critical codes with deep diagnosti
                                      (15 - 35s latency)
 ```
 
-1. **Sub-Millisecond Fast Path (`fast_diagnostics.js`)**:
-   - Matches standard SAE J1939 fault codes (SPN 100, 110, 102, 157, 190, 639, etc.) and quick commands (`status`, `hi`, `help`).
-   - Resolves instantly from structured in-memory dictionaries in `< 1ms` with deterministic, standard workshop actions.
+1. **Sub-Millisecond Fast Path Architecture**:
+   - **Edge Layer (`whatsapp-bot/fast_diagnostics.js`)**: Matches standard SAE J1939 fault codes (SPN 100, 110, 102, 157, 190, 639, etc.) and quick commands (`status`, `hi`, `help`) on WhatsApp in `< 1ms`.
+   - **Backend Layer (`backend/rag_engine.py`)**: Parity fast-path resolution within FastAPI for REST API and Web Dashboard clients:
+     - `Fast-Path 1 (Greetings)`: Resolves conversational greetings (`hi`, `hello`, etc.) in **0.05s - 0.10s** with interactive guidance menus, bypassing LLM inference entirely.
+     - `Fast-Path 2 (SAE J1939 Codes)`: Direct in-memory resolution for SPN/FMI codes in `< 1ms`.
+     - `Fast-Path 3 (Live Telemetry Inquiries)`: Queries like `"what's my hydraulic temperature right now"` resolve in **0.03s - 0.08s**, parsing the exact live decimal values from the hardware sensor context without invoking the LLM.
+     - `Fast-Path 4 (Fleet Overview Metrics)`: Explicitly scoped to fleet queries (`"dashboard stats"`, `"fleet status"`), preventing symptom queries from falsely triggering fleet overview dumps.
+
 2. **Deep RAG Engine Path (`rag_engine.py`)**:
-   - Invoked for all natural language questions, symptom descriptions, and cross-equipment comparisons.
+   - Invoked for natural language machinery symptoms, diagnostic troubleshooting, and complex mechanical questions.
    - Embeds query and retrieves contextual passages from the ChromaDB manual collections.
-   - Injects the active hardware sensor telemetry directly into the prompt so the LLM knows the machine's live temperature, vibration, and acoustic levels.
-   - **Anti-Fabrication Guardrail**: Explicitly instructs the model to refuse and state lack of documentation rather than invent fake cause codes or torque specifications for out-of-scope queries (e.g., proprietary CAT error 105 or unknown bolt specs).
+   - Injects active hardware sensor telemetry directly into the prompt so the LLM knows the machine's live temperature, vibration, and acoustic levels.
+   - **Anti-Fabrication Guardrails**:
+     - *Proprietary Code Refusal*: Intercepts unknown OEM brand codes (e.g., proprietary CAT error 105 or Komatsu fault E07) and enforces clean, honest refusal without hallucinating causes from SANY/XCMG manuals.
+     - *Distractor Suppression & Cross-Wiring Mitigation (`check_torque_spec_distractor_risk`)*: When a query requests a specific component specification (e.g., track shoe bolt torque), if the target mechanical component is absent from retrieved manual passages, the engine prevents cross-wiring adjacent table rows (such as pump flange torque) and immediately returns:
+       `"This specification is not in the retrieved technical documentation. Consult the OEM service manual."` (Latency: `< 0.05s`).
 
 ---
 

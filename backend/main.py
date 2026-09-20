@@ -116,9 +116,9 @@ class SensorData(BaseModel):
     vibration_fft: Optional[list] = None
 
 class DiagnosticQuery(BaseModel):
-    phone_number: str
+    phone_number: str = "web_dashboard"
     message: str
-    equipment_id: Optional[int] = None
+    equipment_id: Optional[int] = 1
 
 class ChatMessage(BaseModel):
     phone_number: str
