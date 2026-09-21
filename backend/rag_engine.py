@@ -8,7 +8,7 @@ import os
 import re
 import glob
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 import chromadb
 from chromadb.utils import embedding_functions
@@ -229,10 +229,26 @@ SYSTEM_PROMPT = (
     "- CRITICAL: NEVER say 'I cannot receive images' or 'I don't have the ability to receive images'. You CAN and DO inspect photos via MechMind Vision.\n\n"
     "RESPONSE FORMAT - CRITICAL:\n"
     "- Write in plain text. Do NOT use markdown. No asterisks, no hashes, no bold markers.\n"
-    "- Use ALL CAPS labels for sections: PROBABLE CAUSES:, IMMEDIATE ACTIONS:, PREVENTIVE MAINTENANCE:\n"
-    "- Use numbered or hyphenated lists under each section.\n"
+    "- For direct specification inquiries (e.g. pressure setting, torque spec, fluid capacity, relief valve setting, part number):\n"
+    "  Always prioritize exact specification tables and OEM service manuals over generic troubleshooting guidance.\n"
+    "  Format your response as:\n"
+    "  SPECIFICATION & TOLERANCE:\n"
+    "  - Standard Spec: [exact number from manual table]\n"
+    "  - Tolerance Limit: [exact range]\n"
+    "  OEM PART NUMBER & COMPONENT:\n"
+    "  - Component / Part Number: [exact part number from table]\n"
+    "  TEST PROCEDURE / NOTES:\n"
+    "  - [Port, test conditions, or notes from table]\n"
+    "- For equipment symptoms, troubleshooting, or fault codes:\n"
+    "  Use ALL CAPS labels for sections: PROBABLE CAUSES:, IMMEDIATE ACTIONS:, PREVENTIVE MAINTENANCE:\n"
+    "  Use numbered or hyphenated lists under each section.\n"
     "- Be concise, direct, authoritative, and technically precise.\n"
     "- Do not use emojis.\n\n"
+    "CRITICAL TELEMETRY BASELINE RULE:\n"
+    "- Inspect [LIVE TELEMETRY AND RECENT ALERTS] carefully.\n"
+    "- If parameters are marked as [NORMAL BASELINE] or within healthy baseline thresholds (e.g. Sound ~40-60 dB, Vibration ~1.0-1.5g, Temp ~20-80C), you MUST state that sensor readings are currently NORMAL and healthy.\n"
+    "- NEVER claim or imply that normal baseline readings are 'slightly elevated', 'abnormal', or 'concerning'. Do not cry wolf.\n"
+    "- If the operator reports an acoustic symptom (e.g. 'weird sound', 'knocking') while the live sound sensor reads normal baseline (~41 dB), acknowledge that the sensor currently reads a normal idle baseline (41 dB), and perform diagnostic triage on the mechanical symptoms they describe (e.g., pump cavitation, bearing whine, valve lash, or turbo whistle) and ask for the specific pitch, operating condition, or location of the sound.\n\n"
     "SAFETY RULES:\n"
     "- Never substitute torque, pressure, or capacity specs between components.\n"
     "- If the exact specification is not in the retrieved reference passages, state: "
@@ -657,14 +673,9 @@ def diagnose_with_rag(query_text: str, sensor_context: str = "", conversation_hi
     greetings_match = re.match(r"^(hi|hello|hey|greetings|good\s*(morning|afternoon|evening)|howdy|sup)\b", query_text.strip(), re.I)
     if greetings_match and len(query_text.strip().split()) <= 4:
         return (
-            "Hello! I am MechMind AI, your heavy machinery diagnostic assistant.\n\n"
-            "Quick Commands & Guidance:\n"
-            "- 'status' or 'telemetry' -> Real-time CAT 320 physical sensor readings\n"
-            "- 'SPN 100' -> Engine oil pressure diagnostic\n"
-            "- 'SPN 110' -> Engine coolant temperature diagnostic\n"
-            "- 'SPN 102' -> Turbocharger boost pressure diagnostic\n"
-            "- 'SPN 639' -> CAN bus diagnostic\n"
-            "- Or describe machine symptoms, fault codes, or equipment models directly."
+            "Hello! I'm MechMind AI, here to help you with any questions about your heavy machinery, "
+            "whether it's troubleshooting, maintenance, live telemetry, or general inquiries. "
+            "How can I assist you today?"
         )
 
     # FAST-PATH 2: Instant SAE J1939 Fault Code Diagnostics (< 1ms)

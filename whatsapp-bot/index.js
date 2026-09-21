@@ -218,14 +218,9 @@ async function handleMessage(msg, sender) {
             // FAST-PATH 1: Instant Greetings (< 1ms)
             if (GREETINGS_RE.test(lower)) {
                 await sendMessage(sender, 
-                    "Hello! I am MechMind AI, your heavy machinery diagnostic assistant.\n\n" +
-                    "Quick Commands:\n" +
-                    "- 'status' -> Real-time CAT 320 sensor telemetry (< 1ms)\n" +
-                    "- 'SPN 110' -> Engine coolant temperature diagnostic\n" +
-                    "- 'SPN 100' -> Engine oil pressure diagnostic\n" +
-                    "- 'SPN 102' -> Turbocharger boost diagnostic\n" +
-                    "- 'SPN 639' -> CAN bus diagnostic\n" +
-                    "- Send Voice Note or Component Photo directly!"
+                    "Hello! I'm MechMind AI, here to help you with any questions about your heavy machinery, " +
+                    "whether it's troubleshooting, maintenance, live telemetry, or general inquiries. " +
+                    "How can I assist you today?"
                 );
                 return;
             }

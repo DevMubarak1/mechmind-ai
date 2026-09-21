@@ -295,6 +295,7 @@ async def diagnose(query: DiagnosticQuery):
 
         # Recent sensor readings for active asset
         readings_text = ""
+        telemetry_status_summary = ""
         if query.equipment_id:
             readings = db.execute(text("""
                 SELECT temperature, vibration_magnitude, sound_level_db, vibration_x, vibration_y, vibration_z, timestamp
@@ -304,10 +305,19 @@ async def diagnose(query: DiagnosticQuery):
             
             if readings:
                 readings_lines = []
+                latest_temp, latest_vmag, latest_sound = readings[0][0], readings[0][1], readings[0][2]
                 for temp, vmag, sound, vx, vy, vz, ts in readings:
                     ts_str = ts.strftime('%H:%M:%S') if hasattr(ts, 'strftime') else str(ts)
-                    readings_lines.append(f"- [{ts_str}] Temp={temp}°C, Vibration={vmag}g (X={vx}, Y={vy}, Z={vz}), Sound={sound}dB")
+                    temp_eval = "NORMAL BASELINE (20-85°C)" if temp < 85 else ("WARNING ELEVATED" if temp < 95 else "CRITICAL OVERHEATING")
+                    vib_eval = "NORMAL BASELINE (1g static gravity, <2.5g)" if vmag < 2.5 else ("WARNING ELEVATED" if vmag < 4.5 else "CRITICAL SEVERE")
+                    sound_eval = "NORMAL BASELINE (ambient/idle envelope, <75dB)" if sound < 75 else ("WARNING ELEVATED" if sound < 85 else "CRITICAL EXCESSIVE")
+                    readings_lines.append(f"- [{ts_str}] Temp={temp}°C [{temp_eval}], Vibration={vmag}g [{vib_eval}], Sound={sound}dB [{sound_eval}]")
                 readings_text = "\n".join(readings_lines)
+
+                if latest_temp < 85 and latest_vmag < 2.5 and latest_sound < 75:
+                    telemetry_status_summary = "PHYSICAL SENSOR STATUS: All monitored parameters (Temperature, Vibration, Acoustic Noise) are currently within healthy, normal safe operational limits."
+                else:
+                    telemetry_status_summary = "PHYSICAL SENSOR STATUS: One or more parameters have breached baseline thresholds. Immediate inspection required."
 
         # Recent active alerts
         alerts_text = ""
@@ -351,6 +361,8 @@ async def diagnose(query: DiagnosticQuery):
 """
         if readings_text:
             dashboard_context += f"\n[LATEST PHYSICAL SENSOR TELEMETRY - NODE-001]\n{readings_text}\n"
+            if telemetry_status_summary:
+                dashboard_context += f"{telemetry_status_summary}\n"
         if alerts_text:
             dashboard_context += f"\n[RECENT ALERTS]\n{alerts_text}\n"
         else:
@@ -375,7 +387,7 @@ async def diagnose(query: DiagnosticQuery):
             INSERT INTO diagnostic_sessions (phone_number, equipment_id, query_type, user_message, ai_response)
             VALUES (:phone, :eq_id, :qtype, :msg, :resp)
         """), {
-            "phone": query.phone_number, "eq_id": query.equipment_id,
+            "phone": (query.phone_number or "")[:20], "eq_id": query.equipment_id,
             "qtype": "text", "msg": query.message, "resp": ai_response
         })
         db.commit()
