@@ -250,7 +250,18 @@ async def check_thresholds(db, equipment_id, equipment_type, data: SensorData):
         if severity:
             message = f"[{severity.upper()} ALERT]: {metric.replace('_', ' ').title()} is {value}{unit} (threshold: {warning}/{critical}{unit})"
             
-            # Store alert immediately (no AI diagnosis yet — that runs in background)
+            # Check cooldown FIRST: only create one alert per 5 minutes per (equipment, metric)
+            # This prevents flooding DB + WhatsApp when sensor stays above threshold
+            cooldown_key = (equipment_id, metric)
+            now = datetime.now()
+            last_fired = _proactive_cooldowns.get(cooldown_key)
+            if last_fired and (now - last_fired).total_seconds() < PROACTIVE_COOLDOWN_SECONDS:
+                # Still in cooldown — skip alert creation entirely
+                continue
+            
+            _proactive_cooldowns[cooldown_key] = now
+            
+            # Store alert (one per cooldown window)
             result = db.execute(text("""
                 INSERT INTO alerts (equipment_id, alert_type, severity, message, sensor_value, threshold)
                 VALUES (:eq_id, :type, :severity, :msg, :val, :thresh) RETURNING id
@@ -264,40 +275,27 @@ async def check_thresholds(db, equipment_id, equipment_type, data: SensorData):
             
             alerts.append({"severity": severity, "metric": metric, "value": value, "message": message})
             
-            # Check cooldown: only run proactive AI diagnosis once per 5 minutes per metric
-            cooldown_key = (equipment_id, metric)
-            now = datetime.now()
-            last_fired = _proactive_cooldowns.get(cooldown_key)
-            should_run_ai = (last_fired is None) or ((now - last_fired).total_seconds() >= PROACTIVE_COOLDOWN_SECONDS)
-            
-            if should_run_ai:
-                _proactive_cooldowns[cooldown_key] = now
-                logger.info(f"PROACTIVE ALERT: Spawning background AI diagnosis for {metric}={value}{unit}")
-                
-                # Fire-and-forget background task — doesn't block sensor ingestion
-                asyncio.create_task(_run_proactive_diagnosis(
-                    alert_id=alert_id,
-                    equipment_id=equipment_id,
-                    equipment_type=equipment_type,
-                    metric=metric,
-                    value=value,
-                    unit=unit,
-                    severity=severity,
-                    message=message,
-                    node_id=data.node_id,
-                    sensor_snapshot={
-                        "temperature": data.temperature,
-                        "vibration_magnitude": data.vibration_magnitude,
-                        "vibration_x": data.vibration_x,
-                        "vibration_y": data.vibration_y,
-                        "vibration_z": data.vibration_z,
-                        "sound_level_db": data.sound_level_db
-                    }
-                ))
-            else:
-                # Cooldown active — still send the raw alert to WhatsApp and SSE (no AI analysis)
-                await broadcast_sse_event({"severity": severity, "metric": metric, "value": value, "message": message, "ai_diagnosis": None})
-                await send_whatsapp_alert(message, data.node_id, None)
+            # Spawn background AI diagnosis (fire-and-forget, non-blocking)
+            logger.info(f"PROACTIVE ALERT: Spawning background AI diagnosis for {metric}={value}{unit}")
+            asyncio.create_task(_run_proactive_diagnosis(
+                alert_id=alert_id,
+                equipment_id=equipment_id,
+                equipment_type=equipment_type,
+                metric=metric,
+                value=value,
+                unit=unit,
+                severity=severity,
+                message=message,
+                node_id=data.node_id,
+                sensor_snapshot={
+                    "temperature": data.temperature,
+                    "vibration_magnitude": data.vibration_magnitude,
+                    "vibration_x": data.vibration_x,
+                    "vibration_y": data.vibration_y,
+                    "vibration_z": data.vibration_z,
+                    "sound_level_db": data.sound_level_db
+                }
+            ))
     
     return alerts
 

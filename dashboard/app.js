@@ -297,10 +297,10 @@ function startRealDataPolling() {
   // Initial fetch to populate charts with historical data
   fetchRealTelemetry(true);
 
-  // Poll every 3 seconds for new readings
+  // Poll every 2 seconds — matches ESP32 send interval for real-time accuracy
   pollInterval = setInterval(() => {
     fetchRealTelemetry(false);
-  }, 3000);
+  }, 2000);
 }
 
 async function fetchRealTelemetry(isInitial) {
