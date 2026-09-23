@@ -110,19 +110,32 @@ async function startBot() {
 
     // Handle incoming messages
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return;
+        console.log(`[DEBUG] messages.upsert event fired. type=${type}, count=${messages.length}`);
+        if (type !== 'notify') {
+            console.log(`[DEBUG] Skipping non-notify type: ${type}`);
+            return;
+        }
 
         for (const msg of messages) {
-            if (!msg.message) continue;
+            if (!msg.message) {
+                console.log(`[DEBUG] Skipping msg with no .message property. key=${JSON.stringify(msg.key)}`);
+                continue;
+            }
             // Ignore messages sent by our bot
-            if (msg.key.id && sentBotMessageIds.has(msg.key.id)) continue;
+            if (msg.key.id && sentBotMessageIds.has(msg.key.id)) {
+                console.log(`[DEBUG] Skipping own bot message: ${msg.key.id}`);
+                continue;
+            }
 
             const sender = msg.key.remoteJid;
+            console.log(`[DEBUG] Message from sender: ${sender}, fromMe: ${msg.key.fromMe}`);
             // Ignore WhatsApp Status/Stories, broadcasts, and group chats
             if (!sender || sender === 'status@broadcast' || sender.endsWith('@broadcast') || sender.endsWith('@g.us')) {
+                console.log(`[DEBUG] Skipping broadcast/group: ${sender}`);
                 continue;
             }
             if (!sender.endsWith('@s.whatsapp.net') && !sender.endsWith('@lid')) {
+                console.log(`[DEBUG] Skipping unknown sender format: ${sender}`);
                 continue;
             }
 
@@ -464,7 +477,28 @@ async function sendStatus(sender) {
 async function sendMessage(jid, text) {
     if (!sock) return null;
     try {
-        const sent = await sock.sendMessage(jid, { text });
+        // If jid is a LID (@lid), try to resolve to @s.whatsapp.net
+        let targetJid = jid;
+        if (jid.endsWith('@lid')) {
+            // Try to find the phone number for this LID using store/lookup
+            // First attempt: use the participant mapping from sock.user
+            const myNumber = sock?.user?.id ? sock.user.id.split(':')[0] : '';
+            const myLid = sock?.user?.lid ? sock.user.lid.split(':')[0].replace(/\D/g, '') : '';
+            const lidNumber = jid.replace('@lid', '').replace(/\D/g, '');
+            
+            // If this LID belongs to us (self-chat), use our phone number
+            if (myLid && lidNumber === myLid) {
+                targetJid = `${myNumber}@s.whatsapp.net`;
+                console.log(`[SEND] Resolved self-LID ${jid} -> ${targetJid}`);
+            } else {
+                // For other LIDs, try sending directly - some Baileys versions support it
+                console.log(`[SEND] Attempting to send to LID directly: ${jid}`);
+            }
+        }
+        
+        console.log(`[SEND] Sending message to ${targetJid}: "${text.substring(0, 50)}..."`);
+        const sent = await sock.sendMessage(targetJid, { text });
+        console.log(`[SEND] Message sent successfully. ID: ${sent?.key?.id || 'unknown'}`);
         if (sent?.key?.id) {
             sentBotMessageIds.add(sent.key.id);
             if (sentBotMessageIds.size > 1000) {
@@ -475,6 +509,16 @@ async function sendMessage(jid, text) {
         return sent;
     } catch (err) {
         console.error(`[MECHMIND BOT] Error sending message to ${jid}:`, err.message);
+        // If LID send fails, try to use participant info from message context
+        if (jid.endsWith('@lid') && msg?.key?.participant) {
+            try {
+                const fallbackJid = msg.key.participant;
+                console.log(`[SEND] LID failed, trying fallback participant: ${fallbackJid}`);
+                return await sock.sendMessage(fallbackJid, { text });
+            } catch (e2) {
+                console.error(`[SEND] Fallback also failed:`, e2.message);
+            }
+        }
         return null;
     }
 }
