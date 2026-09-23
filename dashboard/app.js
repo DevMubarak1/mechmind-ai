@@ -1,5 +1,5 @@
 /**
- * MechMind AI — Telemetry & Diagnostics Frontend Logic (app.js)
+ * MechMind AI v1 — Telemetry & Diagnostics Frontend Logic (app.js)
  * Minimalist Monochrome Aesthetics, High-precision Chart.js, Ollama Copilot
  */
 
@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkSystemHealth();
   startRealDataPolling();
   fetchAlerts();
+  connectProactiveAlertStream();
 
   // Set initial time
   const initTimeEl = document.getElementById('chatInitTime');
@@ -400,12 +401,14 @@ async function fetchAlerts() {
       const sev = (a.severity || 'info').toLowerCase();
       const tag = sev === 'critical' ? 'CRIT' : (sev === 'warning' ? 'WARN' : 'INFO');
       const timeStr = a.time ? new Date(a.time).toLocaleTimeString() : 'RECENT';
+      const aiDiag = a.ai_diagnosis ? `<div class="log-ai-diagnosis">${a.ai_diagnosis.substring(0, 200)}${a.ai_diagnosis.length > 200 ? '...' : ''}</div>` : '';
       return `
         <div class="log-entry ${sev}">
           <div class="log-tag">${tag}</div>
           <div class="log-body">
             <div class="log-title">${a.type ? a.type.toUpperCase() : 'INCIDENT'} · ${sev.toUpperCase()}</div>
             <div class="log-detail">${a.message}</div>
+            ${aiDiag}
             <div class="log-meta">${timeStr} · ${a.equipment || 'CAT 320'}</div>
           </div>
         </div>
@@ -978,5 +981,113 @@ function showConnectedState(phone) {
     qrImg.style.display = 'none';
     qrLoader.style.display = 'flex';
     if (qrLoaderText) qrLoaderText.textContent = 'Device is already connected.';
+  }
+}
+
+
+// ==========================================================
+// Proactive AI Alert Stream (Server-Sent Events)
+// ==========================================================
+// Connects to the backend SSE endpoint to receive real-time
+// proactive alerts with AI diagnosis. When a sensor threshold
+// is breached, the AI automatically analyzes the anomaly and
+// pushes the result here — no user action needed.
+
+let sseConnection = null;
+
+function connectProactiveAlertStream() {
+  const streamUrl = `${API_BASE}/api/alerts/stream`;
+  
+  try {
+    sseConnection = new EventSource(streamUrl);
+    console.log('[SSE] Connecting to proactive alert stream...');
+
+    sseConnection.onopen = () => {
+      console.log('[SSE] Connected to proactive alert stream');
+    };
+
+    sseConnection.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        // Skip the initial connection confirmation
+        if (data.type === 'connected') {
+          console.log('[SSE] Stream confirmed:', data.message);
+          return;
+        }
+
+        // This is a proactive alert with optional AI diagnosis
+        console.log('[SSE] Proactive alert received:', data);
+        
+        // Inject into copilot chat
+        appendProactiveAlert(data);
+        
+        // Refresh the alerts panel
+        fetchAlerts();
+        
+      } catch (e) {
+        // Keepalive or malformed — ignore
+      }
+    };
+
+    sseConnection.onerror = (err) => {
+      console.warn('[SSE] Connection error, will auto-reconnect in 5s...');
+      sseConnection.close();
+      sseConnection = null;
+      // Auto-reconnect after 5 seconds
+      setTimeout(connectProactiveAlertStream, 5000);
+    };
+
+  } catch (e) {
+    console.error('[SSE] Failed to establish stream:', e);
+    setTimeout(connectProactiveAlertStream, 10000);
+  }
+}
+
+/**
+ * Inject a proactive AI alert directly into the copilot chat thread.
+ * This creates a visually distinct "system-initiated" message bubble
+ * so the operator knows this wasn't triggered by a question — the AI
+ * noticed something on its own and is reporting it.
+ */
+function appendProactiveAlert(alertData) {
+  const container = document.getElementById('chatContainer');
+  if (!container) return;
+
+  const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const severity = (alertData.severity || 'warning').toUpperCase();
+  const metric = (alertData.metric || 'sensor').replace(/_/g, ' ').toUpperCase();
+  const sevClass = severity === 'CRITICAL' ? 'proactive-critical' : 'proactive-warning';
+
+  // Build the alert header
+  let alertHtml = `<strong>[${severity}] ${metric}</strong><br>${alertData.message || ''}`;
+
+  // Add AI diagnosis if available
+  if (alertData.ai_diagnosis) {
+    alertHtml += `<br><br><strong>AI Analysis:</strong><br>${formatMarkdown(alertData.ai_diagnosis)}`;
+  }
+
+  const div = document.createElement('div');
+  div.className = `wa-bubble wa-bubble-ai wa-proactive-alert ${sevClass}`;
+  div.innerHTML = `
+    <div class="wa-sender-tag">
+      <span class="wa-sender-name">MECHMIND ENGINE</span>
+      <span class="wa-model-badge wa-proactive-badge">${severity} · AUTO-DIAGNOSIS</span>
+    </div>
+    <div class="wa-message-text">${alertHtml}</div>
+    <div class="wa-msg-meta">
+      <span class="wa-time">${time}</span>
+      <span class="wa-proactive-label">PROACTIVE ALERT</span>
+    </div>
+  `;
+
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+
+  // Flash the copilot nav badge on mobile
+  const navDot = document.querySelector('.nav-dot-badge');
+  if (navDot) {
+    navDot.classList.add('pulse-alert');
+    setTimeout(() => navDot.classList.remove('pulse-alert'), 5000);
   }
 }

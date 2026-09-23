@@ -1,5 +1,5 @@
 /* ==========================================================
-   MechMind AI — Minimalist Monochrome Industrial Design System
+   MechMind AI v1 — Minimalist Monochrome Industrial Design System
    Aesthetic: High-contrast Black & White, Precision Engineering
    ========================================================== */
 
@@ -1867,3 +1867,94 @@ body {
   }
 }
 
+
+/* ==========================================================
+   Proactive AI Alert Styles
+   Visually distinct bubbles for AI-initiated anomaly reports
+   ========================================================== */
+
+.wa-proactive-alert {
+  border-left: 3px solid var(--status-warn);
+  animation: proactive-slide-in 0.4s ease-out;
+}
+
+.wa-proactive-alert.proactive-critical {
+  border-left-color: var(--status-crit);
+  background: rgba(239, 68, 68, 0.06) !important;
+}
+
+.wa-proactive-alert.proactive-warning {
+  border-left-color: var(--status-warn);
+  background: rgba(245, 158, 11, 0.06) !important;
+}
+
+.wa-proactive-badge {
+  background: var(--status-warn) !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+}
+
+.proactive-critical .wa-proactive-badge {
+  background: var(--status-crit) !important;
+  color: #fff !important;
+}
+
+.wa-proactive-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--status-warn);
+  text-transform: uppercase;
+}
+
+.proactive-critical .wa-proactive-label {
+  color: var(--status-crit);
+}
+
+@keyframes proactive-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Alert log AI diagnosis preview */
+.log-ai-diagnosis {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-xs);
+  border-left: 2px solid var(--text-dim);
+  line-height: 1.4;
+}
+
+/* Mobile nav badge pulse for proactive alerts */
+.nav-dot-badge {
+  position: absolute;
+  top: 2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-crit);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.nav-dot-badge.pulse-alert {
+  opacity: 1;
+  animation: badge-pulse 1s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.6; }
+}

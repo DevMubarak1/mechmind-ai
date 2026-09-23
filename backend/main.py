@@ -1,20 +1,21 @@
 """
-MechMind AI — FastAPI Backend
+MechMind AI v1 — FastAPI Backend
 Sensor data ingestion, anomaly detection, AI diagnostics, RAG pipeline
 """
 import re
 import os
 import json
 import logging
+import asyncio
 import tempfile
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from typing import Optional, List
 
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import httpx
@@ -60,6 +61,18 @@ SessionLocal = sessionmaker(bind=engine)
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
 WHATSAPP_BOT_URL = os.getenv("WHATSAPP_BOT_URL", "http://localhost:3001")
 
+# ========================
+# Proactive AI Alerting Infrastructure
+# ========================
+
+# SSE: connected dashboard clients receive real-time alerts
+sse_clients: list[asyncio.Queue] = []
+
+# Cooldown tracker: prevents AI diagnosis spam when sensor stays above threshold
+# Key: (equipment_id, metric), Value: datetime of last proactive diagnosis
+_proactive_cooldowns: dict[tuple, datetime] = {}
+PROACTIVE_COOLDOWN_SECONDS = 300  # 5 minutes between proactive diagnoses per metric
+
 # Whisper model (lazy loaded with CUDA and CPU fallback)
 whisper_model = None
 
@@ -70,8 +83,9 @@ def get_whisper():
             import importlib
             fw = importlib.import_module("faster_whisper")
             whisper_cls = getattr(fw, "WhisperModel")
-            whisper_model = whisper_cls("base", device="cpu", compute_type="int8")
-            logger.info("Whisper model loaded (base, CPU int8)")
+            # Use 'small' model for better accuracy (base was too inaccurate for field conditions)
+            whisper_model = whisper_cls("small", device="cpu", compute_type="int8")
+            logger.info("Whisper model loaded (small, CPU int8)")
         except Exception as e:
             logger.warning(f"faster_whisper initialization error ({e}). Voice transcription fallback enabled.")
             whisper_model = None
@@ -86,7 +100,7 @@ async def lifespan(app: FastAPI):
     logger.info("MechMind AI Backend shutting down...")
 
 app = FastAPI(
-    title="MechMind AI",
+    title="MechMind AI v1",
     description="AI-Powered Construction Equipment Diagnostics",
     version="1.0.0",
     lifespan=lifespan
@@ -139,7 +153,7 @@ async def root():
     index_file = os.path.join(DASHBOARD_DIR, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
-    return {"service": "MechMind AI", "status": "running", "version": "1.0.0"}
+    return {"service": "MechMind AI v1", "status": "running", "version": "1.0.0"}
 
 @app.get("/health")
 async def health():
@@ -163,6 +177,7 @@ async def health():
     
     return {
         "status": "healthy" if checks["database"] else "degraded",
+        "version": "v1",
         "checks": checks,
         "active_model": OLLAMA_MODEL
     }
@@ -206,7 +221,8 @@ async def ingest_sensor_data(data: SensorData):
 
 
 async def check_thresholds(db, equipment_id, equipment_type, data: SensorData):
-    """Check sensor data against alert thresholds"""
+    """Check sensor data against alert thresholds — triggers proactive AI diagnosis with 5-min cooldown.
+    Alert is stored immediately; AI diagnosis runs in the background so sensor ingestion isn't blocked."""
     alerts = []
     
     thresholds = db.execute(
@@ -234,31 +250,163 @@ async def check_thresholds(db, equipment_id, equipment_type, data: SensorData):
         if severity:
             message = f"[{severity.upper()} ALERT]: {metric.replace('_', ' ').title()} is {value}{unit} (threshold: {warning}/{critical}{unit})"
             
-            db.execute(text("""
+            # Store alert immediately (no AI diagnosis yet — that runs in background)
+            result = db.execute(text("""
                 INSERT INTO alerts (equipment_id, alert_type, severity, message, sensor_value, threshold)
-                VALUES (:eq_id, :type, :severity, :msg, :val, :thresh)
+                VALUES (:eq_id, :type, :severity, :msg, :val, :thresh) RETURNING id
             """), {
                 "eq_id": equipment_id, "type": metric, "severity": severity,
-                "msg": message, "val": value, "thresh": critical if severity == "critical" else warning
+                "msg": message, "val": value,
+                "thresh": critical if severity == "critical" else warning
             })
+            alert_id = result.fetchone()[0]
             db.commit()
             
             alerts.append({"severity": severity, "metric": metric, "value": value, "message": message})
             
-            # Send WhatsApp alert
-            await send_whatsapp_alert(message, data.node_id)
+            # Check cooldown: only run proactive AI diagnosis once per 5 minutes per metric
+            cooldown_key = (equipment_id, metric)
+            now = datetime.now()
+            last_fired = _proactive_cooldowns.get(cooldown_key)
+            should_run_ai = (last_fired is None) or ((now - last_fired).total_seconds() >= PROACTIVE_COOLDOWN_SECONDS)
+            
+            if should_run_ai:
+                _proactive_cooldowns[cooldown_key] = now
+                logger.info(f"PROACTIVE ALERT: Spawning background AI diagnosis for {metric}={value}{unit}")
+                
+                # Fire-and-forget background task — doesn't block sensor ingestion
+                asyncio.create_task(_run_proactive_diagnosis(
+                    alert_id=alert_id,
+                    equipment_id=equipment_id,
+                    equipment_type=equipment_type,
+                    metric=metric,
+                    value=value,
+                    unit=unit,
+                    severity=severity,
+                    message=message,
+                    node_id=data.node_id,
+                    sensor_snapshot={
+                        "temperature": data.temperature,
+                        "vibration_magnitude": data.vibration_magnitude,
+                        "vibration_x": data.vibration_x,
+                        "vibration_y": data.vibration_y,
+                        "vibration_z": data.vibration_z,
+                        "sound_level_db": data.sound_level_db
+                    }
+                ))
+            else:
+                # Cooldown active — still send the raw alert to WhatsApp and SSE (no AI analysis)
+                await broadcast_sse_event({"severity": severity, "metric": metric, "value": value, "message": message, "ai_diagnosis": None})
+                await send_whatsapp_alert(message, data.node_id, None)
     
     return alerts
 
 
-async def send_whatsapp_alert(message: str, node_id: str):
-    """Send alert to WhatsApp bot for notification"""
+async def _run_proactive_diagnosis(alert_id: int, equipment_id: int, equipment_type: str,
+                                    metric: str, value: float, unit: str, severity: str,
+                                    message: str, node_id: str, sensor_snapshot: dict):
+    """Background task: runs RAG AI diagnosis, updates the alert record, pushes to SSE + WhatsApp.
+    This runs independently of the sensor ingestion pipeline so the ESP32 isn't blocked.
+    Uses the same hardened diagnose_with_rag() and SYSTEM_PROMPT as the reactive path."""
+    ai_diagnosis = None
+    try:
+        # Look up equipment name for grounded context
+        eq_name = "Unknown Asset"
+        try:
+            with SessionLocal() as db:
+                eq_row = db.execute(text("SELECT name, model FROM equipment WHERE id = :id"), {"id": equipment_id}).fetchone()
+                if eq_row:
+                    eq_name = f"{eq_row[0]} (Model {eq_row[1]}, {node_id})"
+        except Exception:
+            pass
+
+        # Build baseline evaluation tags matching reactive path format
+        temp = sensor_snapshot['temperature']
+        vmag = sensor_snapshot['vibration_magnitude']
+        sound = sensor_snapshot['sound_level_db']
+        temp_eval = "NORMAL BASELINE (20-85C)" if temp < 85 else ("WARNING ELEVATED" if temp < 95 else "CRITICAL OVERHEATING")
+        vib_eval = "NORMAL BASELINE (1g static, <2.5g)" if vmag < 2.5 else ("WARNING ELEVATED" if vmag < 4.5 else "CRITICAL SEVERE")
+        sound_eval = "NORMAL BASELINE (<75dB)" if sound < 75 else ("WARNING ELEVATED" if sound < 85 else "CRITICAL EXCESSIVE")
+
+        # Build machine-specific anomaly prompt with grounded context
+        anomaly_prompt = (
+            f"PROACTIVE ALERT on {eq_name}: The {metric.replace('_', ' ')} sensor just breached the "
+            f"{severity} threshold. Current reading: {value}{unit}. "
+            f"Based on these readings and your knowledge of this equipment type ({equipment_type}), "
+            f"what are the most likely causes of this anomaly? What immediate actions should the operator take? "
+            f"Reference the specific machine ({eq_name}) and the actual breaching value ({value}{unit}) in your response."
+        )
+
+        # Build enriched sensor context matching reactive path format (with baseline evaluation tags)
+        sensor_context = (
+            f"[LIVE DASHBOARD & FLEET METRICS]\n"
+            f"- Active Inspected Asset: {eq_name}\n"
+            f"- Equipment Type: {equipment_type}\n\n"
+            f"[LATEST PHYSICAL SENSOR TELEMETRY - {node_id}]\n"
+            f"- Temp={temp}C [{temp_eval}], Vibration={vmag}g [{vib_eval}], Sound={sound}dB [{sound_eval}]\n"
+            f"- Vibration Axes: X={sensor_snapshot['vibration_x']}, Y={sensor_snapshot['vibration_y']}, Z={sensor_snapshot['vibration_z']}\n\n"
+            f"[THRESHOLD BREACH]\n"
+            f"- Metric: {metric}, Value: {value}{unit}, Severity: {severity.upper()}\n"
+            f"PHYSICAL SENSOR STATUS: {metric.replace('_', ' ').title()} has breached {severity} threshold. Immediate inspection required."
+        )
+        
+        # This is the slow call (~30-90s) — runs in background
+        # Uses the SAME hardened diagnose_with_rag() as the reactive /api/diagnose path
+        # so all guardrails apply: distractor suppression, no-context abstention, baseline eval
+        ai_diagnosis = diagnose_with_rag(
+            query_text=anomaly_prompt,
+            sensor_context=sensor_context,
+            conversation_history=""
+        )
+        if ai_diagnosis:
+            ai_diagnosis = strip_emojis(ai_diagnosis).strip()
+            
+        logger.info(f"PROACTIVE ALERT: AI diagnosis complete for alert {alert_id} ({metric})")
+        
+    except Exception as e:
+        logger.error(f"Proactive AI diagnosis failed for alert {alert_id}: {e}")
+        ai_diagnosis = None
+    
+    # Update the alert record with the AI diagnosis
+    try:
+        with SessionLocal() as db:
+            db.execute(text("UPDATE alerts SET ai_diagnosis = :diag WHERE id = :id"),
+                       {"diag": ai_diagnosis, "id": alert_id})
+            db.commit()
+    except Exception as e:
+        logger.error(f"Failed to update alert {alert_id} with AI diagnosis: {e}")
+    
+    # Now push to SSE and WhatsApp with the completed diagnosis
+    alert_payload = {
+        "severity": severity, "metric": metric, "value": value,
+        "message": message, "ai_diagnosis": ai_diagnosis
+    }
+    await broadcast_sse_event(alert_payload)
+    await send_whatsapp_alert(message, node_id, ai_diagnosis)
+
+
+async def broadcast_sse_event(alert_data: dict):
+    """Push a proactive alert event to all connected SSE dashboard clients"""
+    event_payload = json.dumps(alert_data)
+    dead_clients = []
+    for q in sse_clients:
+        try:
+            q.put_nowait(event_payload)
+        except asyncio.QueueFull:
+            dead_clients.append(q)
+    for q in dead_clients:
+        sse_clients.remove(q)
+
+
+async def send_whatsapp_alert(message: str, node_id: str, ai_diagnosis: str = None):
+    """Send alert to WhatsApp bot — includes AI analysis when available"""
     try:
         async with httpx.AsyncClient() as client:
             await client.post(f"{WHATSAPP_BOT_URL}/api/send-alert", json={
                 "message": message,
-                "node_id": node_id
-            }, timeout=5.0)
+                "node_id": node_id,
+                "ai_diagnosis": ai_diagnosis
+            }, timeout=15.0)
     except Exception as e:
         logger.error(f"Failed to send WhatsApp alert: {e}")
 
@@ -430,7 +578,15 @@ async def diagnose_voice(file: UploadFile = File(...), phone_number: str = Form(
     try:
         model = get_whisper()
         if model:
-            segments, _ = model.transcribe(tmp_path, beam_size=5)
+            # Use language hint + VAD filter + initial prompt with machinery terms for accuracy
+            segments, _ = model.transcribe(
+                tmp_path,
+                beam_size=5,
+                language="en",
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500),
+                initial_prompt="MechMind AI field diagnostic. Heavy machinery, excavator, hydraulic pump, engine temperature, vibration, CAT 320, SANY SY215C."
+            )
             transcription = " ".join([segment.text for segment in segments]).strip()
         else:
             transcription = "Operator reported abnormal machinery noise and vibration."
@@ -550,15 +706,53 @@ async def get_readings(equipment_id: int, limit: int = 50):
 
 @app.get("/api/alerts")
 async def get_alerts(limit: int = 20):
-    """Get recent alerts"""
+    """Get recent alerts with AI diagnosis"""
     with SessionLocal() as db:
         rows = db.execute(text("""
-            SELECT a.id, a.alert_type, a.severity, a.message, a.sensor_value, a.created_at, e.name
+            SELECT a.id, a.alert_type, a.severity, a.message, a.sensor_value, a.created_at, e.name, a.ai_diagnosis
             FROM alerts a LEFT JOIN equipment e ON a.equipment_id = e.id
             ORDER BY a.created_at DESC LIMIT :lim
         """), {"lim": limit}).fetchall()
         
-        return [{"id": r[0], "type": r[1], "severity": r[2], "message": r[3], "value": r[4], "time": r[5].isoformat(), "equipment": r[6]} for r in rows]
+        return [{"id": r[0], "type": r[1], "severity": r[2], "message": r[3], "value": r[4], "time": r[5].isoformat(), "equipment": r[6], "ai_diagnosis": r[7]} for r in rows]
+
+
+@app.get("/api/alerts/stream")
+async def alerts_stream(request: Request):
+    """Server-Sent Events endpoint — pushes proactive AI alerts to connected dashboards in real-time"""
+    queue: asyncio.Queue = asyncio.Queue(maxsize=50)
+    sse_clients.append(queue)
+    logger.info(f"SSE client connected. Total clients: {len(sse_clients)}")
+
+    async def event_generator():
+        try:
+            # Send initial keepalive
+            yield f"data: {json.dumps({'type': 'connected', 'message': 'SSE stream active'})}\n\n"
+            while True:
+                # Check if client disconnected
+                if await request.is_disconnected():
+                    break
+                try:
+                    # Wait for alert events with a timeout for keepalive
+                    data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {data}\n\n"
+                except asyncio.TimeoutError:
+                    # Send keepalive ping
+                    yield f": keepalive\n\n"
+        finally:
+            if queue in sse_clients:
+                sse_clients.remove(queue)
+            logger.info(f"SSE client disconnected. Remaining: {len(sse_clients)}")
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @app.get("/api/dashboard/stats")
 async def dashboard_stats():

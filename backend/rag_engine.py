@@ -1,5 +1,5 @@
 """
-MechMind AI - RAG Diagnostic Engine
+MechMind AI v1 - RAG Diagnostic Engine
 Retrieval-Augmented Generation for Heavy Machinery Maintenance and Telemetry Analysis.
 Uses ChromaDB vector store + all-MiniLM-L6-v2 embeddings + Ollama (Llama 3.1 8B).
 """

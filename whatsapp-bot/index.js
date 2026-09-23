@@ -1,5 +1,5 @@
 /**
- * MechMind AI WhatsApp Bot
+ * MechMind AI v1 — WhatsApp Bot
  * Uses Baileys (open-source WhatsApp Web API) + Express for internal API
  */
 
@@ -261,7 +261,9 @@ async function handleMessage(msg, sender) {
             }
 
             // FAST-PATH 5: In-Memory Response Cache (< 0.01ms)
-            if (FAST_RESPONSE_CACHE.has(lower)) {
+            // Skip cache for follow-up style queries — these need conversation history from the backend
+            const isFollowUp = /\b(it|that|this|the|what|why|how|also|and|but|so|then|next|more|again|still|same|previous|earlier|before|last|about)\b/i.test(lower) && lower.split(/\s+/).length <= 12;
+            if (!isFollowUp && FAST_RESPONSE_CACHE.has(lower)) {
                 console.log(`[FAST-PATH CACHE] Returning cached diagnosis for: "${lower}"`);
                 await sendMessage(sender, FAST_RESPONSE_CACHE.get(lower));
                 return;
@@ -328,11 +330,15 @@ async function handleTextQuery(sender, phoneNumber, text, lowerKey) {
         stopTyping();
         const response = stripMarkdown(res.data.response || 'No diagnosis available.');
 
-        // Cache response in memory for instant future lookups
-        FAST_RESPONSE_CACHE.set(lowerKey, response);
-        if (FAST_RESPONSE_CACHE.size > 500) {
-            const firstKey = FAST_RESPONSE_CACHE.keys().next().value;
-            FAST_RESPONSE_CACHE.delete(firstKey);
+        // Cache response in memory — but only for queries that aren't follow-ups
+        // Follow-up queries need fresh conversation history each time
+        const isFollowUp = /\b(it|that|this|the|what|why|how|also|and|but|so|then|next|more|again|still|same|previous|earlier|before|last|about)\b/i.test(lowerKey) && lowerKey.split(/\s+/).length <= 12;
+        if (!isFollowUp) {
+            FAST_RESPONSE_CACHE.set(lowerKey, response);
+            if (FAST_RESPONSE_CACHE.size > 500) {
+                const firstKey = FAST_RESPONSE_CACHE.keys().next().value;
+                FAST_RESPONSE_CACHE.delete(firstKey);
+            }
         }
 
         await sendMessage(sender, response);
@@ -477,26 +483,32 @@ async function sendMessage(jid, text) {
 // Express API Endpoints
 // ========================
 
-// Send alert to configured WhatsApp recipients
+// Send alert to configured WhatsApp recipients (with optional AI diagnosis)
 apiApp.post('/api/send-alert', async (req, res) => {
-    const { message, node_id } = req.body;
+    const { message, node_id, ai_diagnosis } = req.body;
 
     if (!sock || !sock.user) {
         return res.status(503).json({ error: 'WhatsApp not connected' });
+    }
+
+    // Build the alert message — include AI diagnosis when available
+    let alertText = `*⚠️ ALERT from ${node_id}*\n\n${message}`;
+    if (ai_diagnosis) {
+        alertText += `\n\n*🤖 MechMind AI Analysis:*\n${ai_diagnosis}`;
     }
 
     let sent = 0;
     for (const recipient of ALERT_RECIPIENTS) {
         try {
             const jid = `${recipient.replace(/\D/g, '')}@s.whatsapp.net`;
-            await sendMessage(jid, `*ALERT from ${node_id}*\n\n${message}`);
+            await sendMessage(jid, alertText);
             sent++;
         } catch (e) {
             console.error(`Failed to send alert to ${recipient}:`, e.message);
         }
     }
 
-            res.json({ sent, total: ALERT_RECIPIENTS.length });
+    res.json({ sent, total: ALERT_RECIPIENTS.length });
 });
 
 // Send custom message to any phone or JID
