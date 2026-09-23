@@ -171,7 +171,7 @@ void setup() {
   digitalWrite(STATUS_LED_PIN, LOW);
 
   Serial.println("======================================");
-  Serial.println(" MechMind AI — ESP32 Sensor Node v2.0");
+  Serial.println(" MechMind AI — ESP32 Sensor Node v1  ");
   Serial.println(" DS18B20 + ADXL345 + INMP441          ");
   Serial.println("======================================");
 
