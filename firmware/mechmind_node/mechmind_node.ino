@@ -48,17 +48,17 @@ const char* NODE_ID    = "NODE-001"; // Matches CAT 320 Excavator in DB
 #define DS18B20_PIN    4   // Data pin (needs 4.7kΩ pull-up to 3.3V)
 
 // INMP441 I2S MEMS Microphone (Matches Hardware Assembly Guide)
-#define I2S_WS_PIN     25  // Word Select (L/R clock)
-#define I2S_SCK_PIN    33  // Serial Clock (BCLK)
-#define I2S_SD_PIN     32  // Serial Data Out (DOUT)
+#define I2S_WS_PIN     25  // Word Select (L/R clock) — Pin 9 (Left side: GPIO25)
+#define I2S_SCK_PIN    19  // Serial Clock (BCLK) — Pin 31 (Right side: GPIO19)
+#define I2S_SD_PIN     32  // Serial Data Out (DOUT) — Pin 7 (Left side: GPIO32)
 #define I2S_PORT       I2S_NUM_0
 #define I2S_BUFFER_LEN 512
 
 // Status LED
 #define STATUS_LED_PIN 2   // Built-in blue LED on ESP32
 
-// Hardware presence toggle (Set to true once replacement INMP441 arrives!)
-#define ENABLE_I2S_MIC false
+// Hardware presence toggle — Enabled with INMP441 connected
+#define ENABLE_I2S_MIC true
 
 // ========================
 // Sensor Instances

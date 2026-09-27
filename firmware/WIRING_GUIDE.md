@@ -41,6 +41,9 @@ Look at your ESP32 with the Micro-USB port facing **DOWN**:
   * **Pin 36 (3rd from Top):** `GIOP22` ⬅️ **I2C SCL (Clock for ADXL345)**
   * **Pin 33 (6th from Top):** `GIOP21` ⬅️ **I2C SDA (Data for ADXL345)**
   * **Pin 26 (13th from Top / 7th from Bottom):** `GIOP4` ⬅️ **Temperature Data for DS18B20**
+  * **Pin 25 (9th from Top):** `GIOP25` ⬅️ **I2S WS (Word Select for INMP441)**
+  * **Pin 24 (10th from Top):** `GIOP33` ⬅️ **I2S SCK / BCLK (Serial Clock for INMP441)**
+  * **Pin 23 (11th from Top):** `GIOP32` ⬅️ **I2S SD (Serial Data from INMP441)**
 
 ---
 
@@ -261,6 +264,143 @@ You do not need to pull the 18650 cell out of the blue holder every time you wan
 
 ---
 
+### PART 5: INMP441 I2S MEMS Microphone (Sound Sensor — 5 Wires + 1 Ground Tie)
+
+> 🎤 **What is the INMP441?**
+>
+> It's a tiny digital microphone that outputs audio data over the I2S protocol (a digital audio bus). Unlike analog microphones, it sends clean digital samples directly to the ESP32 — no ADC needed. The ESP32 reads raw PCM audio, calculates the RMS (root-mean-square) amplitude, and converts it to a decibel (dB SPL) reading for acoustic anomaly detection.
+
+---
+
+#### 🔍 Step 1: Identify Your INMP441 Board (Circular HW-906CD Model)
+
+Your sensor is the **circular `HW-906CD` INMP441 MEMS microphone module** (a round coin-sized black PCB).
+
+Looking directly at the front of the board (with `HW-906CD` printed in the middle):
+
+```
+             ╭────────────────╮
+             │    HW-906CD    │
+     (SD)  ○ │       ○        │ ○  (SCK)
+    (VDD)  ○ │   (Mic Hole)   │ ○  (WS)
+    (GND)  ○ │                │ ○  (L/R)
+             ╰────────────────╯
+              LEFT         RIGHT
+```
+
+##### 📋 Exact Pin Assignment on the HW-906CD:
+
+| Side of HW-906CD | Pin Label | Full Name | Where It Connects on ESP32 | Purpose |
+|---|---|---|---|---|
+| **Left** | **`SD`** | Serial Data | **Pin 7 (`GPIO32`)** *(7th pin down, **LEFT** side of ESP32)* | Digital audio data line read by ESP32 |
+| **Left** | **`VDD`** | 3.3V Power | **Red Rail (+)** | 3.3V power supply (**Never connect to 5V!**) |
+| **Left** | **`GND`** | Ground | **Blue Rail (-)** | Common ground |
+| **Right** | **`SCK`** | Serial Clock | **Pin 31 (`GPIO19`)** *(8th pin down, **RIGHT** side of ESP32)* | I2S bit clock (BCLK) |
+| **Right** | **`WS`** | Word Select | **Pin 9 (`GPIO25`)** *(9th pin down, **LEFT** side of ESP32)* | I2S word select clock (LRCLK) |
+| **Right** | **`L/R`** | Left/Right Select | **Blue Rail (-)** | Connect to **GND** for Left channel (Required!) |
+
+> ⚠️ **Important:** The `L/R` pin MUST be tied to **GND** (Blue Rail). If left ungrounded/floating, the microphone will not output any audio frames!
+
+---
+
+#### 🔌 Step 2: How to Connect the Circular HW-906CD to Your Breadboard
+
+##### ⚠️ Why You Cannot Push This Board Flat Into the Breadboard
+On a solderless breadboard, **holes `a, b, c, d, e` in the same horizontal row are connected together underneath**.
+Because the HW-906CD is a round board with 3 pins on the left and 3 on the right:
+* If you tried to push it into the breadboard, pins on the left and right in the same rows would be **short-circuited together**.
+* **Do NOT attempt to push the round PCB directly into the breadboard clips.**
+
+---
+
+##### 🛠️ How to Connect the Pins (Choose Method A or B):
+
+###### Method A: Solder Header Pins + Female-to-Male (F-M) Wires (Recommended)
+1. Take a strip of standard male header pins (often included with sensor kits).
+2. Solder 3 pins on the left (`SD`, `VDD`, `GND`) and 3 pins on the right (`SCK`, `WS`, `L/R`), pointing downward or upward.
+3. Use **6 Female-to-Male (F-M) Dupont jumper wires**:
+   * Push the **Female ends** directly onto the 6 soldered pins on the HW-906CD.
+   * Plug the **Male ends** into the Breadboard rails and ESP32 GPIO positions.
+
+```
+       HW-906CD Module (Free-floating / Raised)
+        ┌───────────────────────────────────┐
+        │  [SD]   [VDD]   [GND]             │  (Left pins)
+        │  [SCK]  [WS]    [L/R]             │  (Right pins)
+        └───────────────────────────────────┘
+             │      │       │
+      (6x Female-to-Male Dupont Jumper Wires)
+             │      │       │
+             ▼      ▼       ▼
+       [Breadboard Rails & ESP32 GPIO Holes]
+```
+
+###### Method B: Direct Wire Soldering (Permanent & Compact)
+* Cut 6 jumper wires, strip a tiny piece of insulation off one end, insert through the 6 holes on the HW-906CD, and solder directly.
+* The male ends of the wires then plug directly into your breadboard!
+
+###### Method C: Quick Testing (If you don't have a soldering iron right now)
+* Insert male jumper wire pins through each hole and bend slightly or use header pins pushed through with a tiny bit of tape/putty for temporary contact testing before final soldering.
+
+##### 🎤 Microphone Orientation
+Make sure the **tiny silver acoustic hole** in the center faces outward toward the room/machinery so it can freely capture acoustic frequencies. Do not block or cover the hole with glue or tape.
+
+---
+
+#### 🔌 Step 3: Wire-by-Wire Connections (5 Wires + 1 Ground Tie)
+
+> 💡 **Jumper Wire Note:** If your INMP441 module is plugged into column `a`, use **Male-to-Male (M-M)** wires from column `b`. If your module has pins in a circle/2x3 and you are connecting directly to its pins, use **Female-to-Male (F-M)** wires (Female end on module pin, Male end into destination).
+
+* 🔴 **Wire 12 — Red (M-M or F-M):**
+  * **From:** INMP441 **`VDD`** (or column `b` in VDD row) ➡️ **To:** Any hole in the **Red Rail (+)**.
+  * *(Powers the microphone with 3.3V.)*
+
+* ⚫ **Wire 13 — Black (M-M or F-M):**
+  * **From:** INMP441 **`GND`** (or column `b` in GND row) ➡️ **To:** Any hole in the **Blue Rail (-)**.
+  * *(Common ground.)*
+
+* ⚫ **Wire 14 — Black (M-M or F-M):**
+  * **From:** INMP441 **`L/R`** (or column `b` in L/R row) ➡️ **To:** Any hole in the **Blue Rail (-)**.
+  * *(Ties L/R to GND = Left channel. This is required — do not skip!)*
+
+* 🟠 **Wire 15 — Orange / Any color (M-M or F-M):**
+  * **From:** INMP441 **`WS`** (Right side of HW-906CD) ➡️ **To:** Breadboard hole directly in line with **Pin 9 (`GPIO25`)** *(9th pin down on the **LEFT** side of ESP32 — column `a`, `b`, `c`, or `d` in row 9)*.
+  * *(Word Select / LRCLK signal.)*
+
+* 🟣 **Wire 16 — Purple / Any color (M-M or F-M):**
+  * **From:** INMP441 **`SCK`** (Right side of HW-906CD) ➡️ **To:** Breadboard hole directly in line with **Pin 31 (`GPIO19`)** *(8th pin down on the **RIGHT** side of ESP32 — column `g`, `h`, `i`, or `j` in row for Pin 31)*.
+  * *(Serial Clock / BCLK signal.)*
+
+* 🟤 **Wire 17 — Brown / Any color (M-M or F-M):**
+  * **From:** INMP441 **`SD`** (Left side of HW-906CD) ➡️ **To:** Breadboard hole directly in line with **Pin 7 (`GPIO32`)** *(7th pin down on the **LEFT** side of ESP32 — column `a`, `b`, `c`, or `d` in row 7)*.
+  * *(Serial Data — the actual digital audio stream read by ESP32.)*
+
+---
+
+#### 🧪 Quick Verification After Wiring:
+
+1. Double-check that **`L/R`** is tied to **GND** (Blue Rail) — not left floating!
+2. Make sure **`VDD`** goes to the **Red Rail (+)** (3.3V), NOT to 5V. The INMP441 is a 3.3V device.
+3. Confirm no wires from the INMP441 touch the ADXL345 or DS18B20 rows.
+4. The tiny **silver microphone hole** on the board should face upward / outward, not pressed against the breadboard.
+
+---
+
+#### 🔧 Enable in Firmware:
+
+In [`mechmind_node.ino`](file:///c:/Users/XPS/Downloads/china/mechmind-ai/firmware/mechmind_node/mechmind_node.ino) lines 51-61:
+
+```cpp
+#define I2S_WS_PIN     25  // Pin 9 (Left: GPIO25)
+#define I2S_SCK_PIN    19  // Pin 31 (Right: GPIO19) - Plenty of room!
+#define I2S_SD_PIN     32  // Pin 7 (Left: GPIO32)
+#define ENABLE_I2S_MIC true
+```
+
+Upload the firmware via USB. The serial monitor should now show real `sound_db` readings instead of the simulated baseline.
+
+---
+
 ## 📊 Complete Wiring & Jumper Wire Specification Table
 
 |         Wire / Item         |         Jumper Wire Type         |   Color   | From (Origin)                                 | To (Destination)                                     | Purpose                     |
@@ -271,14 +411,20 @@ You do not need to pull the 18650 cell out of the blue holder every time you wan
 |      **Wire 4**      |   **Male-to-Male (M-M)**   |  🔴 Red  | ADXL345`CS`                                 | **Red Rail (+)**                               | Enables I2C mode            |
 |      **Wire 5**      |   **Male-to-Male (M-M)**   | ⚫ Black | ADXL345`GND`                                | **Blue Rail (-)**                              | Accelerometer Ground        |
 |      **Wire 6**      |   **Male-to-Male (M-M)**   | ⚫ Black | ADXL345`SDO`                                | **Blue Rail (-)**                              | Sets I2C address to`0x53` |
-|      **Wire 7**      |   **Male-to-Male (M-M)**   |  🔵 Blue  | ADXL345`SDA`                                | **Pin 33** (6th down, Right: `GIOP21`)       | I2C Data Line               |
-|      **Wire 8**      |   **Male-to-Male (M-M)**   | 🟡 Yellow | ADXL345`SCL`                                | **Pin 36** (3rd down, Right: `GIOP22`)       | I2C Clock Line              |
-|      **Wire 9**      |   **Male-to-Male (M-M)**   | 🟢 Green | Row 30 (Yellow probe lead)                    | **Pin 26** (13th down, Right: `GIOP4`)       | Temperature Data Line       |
+|      **Wire 7**      |   **Male-to-Male (M-M)**   |  🔵 Blue  | ADXL345`SDA`                                | **Pin 33** (6th down, Right: `GPIO21`)       | I2C Data Line               |
+|      **Wire 8**      |   **Male-to-Male (M-M)**   | 🟡 Yellow | ADXL345`SCL`                                | **Pin 36** (3rd down, Right: `GPIO22`)       | I2C Clock Line              |
+|      **Wire 9**      |   **Male-to-Male (M-M)**   | 🟢 Green | Row 30 (Yellow probe lead)                    | **Pin 26** (13th down, Right: `GPIO4`)        | Temperature Data Line       |
 |     **Resistor**     |    **4.7kΩ Resistor**    |   Multi   | Row 30 (Yellow probe lead)                    | **Red Rail (+)**                               | OneWire Pull-up Resistor    |
 |  **Holder Red Lead**  |   **Pre-attached Lead**   |  🔴 Red  | 18650 Holder Flat Plate (+)                   | Charger Board**`B+`**                        | Battery Positive Input      |
 | **Holder Black Lead** |   **Pre-attached Lead**   | ⚫ Black | 18650 Holder Spring (-)                       | Charger Board**`B-`**                        | Battery Negative Input      |
 |      **Wire 10**      | **Cut M-M (Male-to-Bare)** |  🔴 Red  | Charger Board**`OUT+`** (Bare copper) | **Pin 19** (Bottom Left: `Vin 5V`, Male Pin) | 5V Boosted Power to ESP32   |
 |      **Wire 11**      | **Cut M-M (Male-to-Bare)** | ⚫ Black | Charger Board**`OUT-`** (Bare copper) | **Blue Rail (-)** (Male Pin)                   | Battery Ground Return       |
+|      **Wire 12**      | **M-M or F-M**             |  🔴 Red  | INMP441`VDD`                                | **Red Rail (+)**                               | Microphone 3.3V Power       |
+|      **Wire 13**      | **M-M or F-M**             | ⚫ Black | INMP441`GND`                                | **Blue Rail (-)**                              | Microphone Ground           |
+|      **Wire 14**      | **M-M or F-M**             | ⚫ Black | INMP441`L/R`                                | **Blue Rail (-)**                              | Left Channel Select (GND)   |
+|      **Wire 15**      | **M-M or F-M**             | 🟠 Orange | INMP441`WS`                                 | **Pin 9** (9th down, Left: `GPIO25`)         | I2S Word Select (LRCLK)     |
+|      **Wire 16**      | **M-M or F-M**             | 🟣 Purple | INMP441`SCK`                                | **Pin 31** (8th down, Right: `GPIO19`)       | I2S Serial Clock (BCLK)     |
+|      **Wire 17**      | **M-M or F-M**             | 🟤 Brown | INMP441`SD`                                 | **Pin 7** (7th down, Left: `GPIO32`)         | I2S Serial Data (Audio In)  |
 
 ---
 
