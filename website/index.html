@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MechMind AI — Smart Diagnostics for Heavy Construction Machinery</title>
+  <meta name="description" content="MechMind AI uses IoT sensors and AI to diagnose faults in heavy construction equipment. Get expert-level diagnostics through WhatsApp.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect rx='20' width='100' height='100' fill='%23FF6B2B'/><text x='50' y='70' text-anchor='middle' font-size='60' fill='white' font-family='sans-serif' font-weight='bold'>M</text></svg>">
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+</head>
+<body>
+
+  <!-- ====== NAVBAR ====== -->
+  <nav class="navbar" id="navbar">
+    <div class="navbar-inner">
+      <a href="#" class="nav-logo">
+        <span class="mech">Mech</span><span class="mind">Mind</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#platform">Platform</a></li>
+        <li><a href="#features">How It Works</a></li>
+        <li><a href="#hardware">Hardware</a></li>
+        <li><a href="#accuracy">Accuracy</a></li>
+        <li><a href="https://github.com/DevMubarak1/mechmind-ai" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a href="#demo" class="btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          See Demo
+        </a>
+        <a href="https://wa.me/2347010299562" class="btn-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Try on WhatsApp
+        </a>
+      </div>
+      <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="menuIcon"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile Nav -->
+  <div class="mobile-nav" id="mobileNav">
+    <a href="#platform">Platform</a>
+    <a href="#features">How It Works</a>
+    <a href="#hardware">Hardware</a>
+    <a href="#accuracy">Accuracy</a>
+    <a href="https://github.com/DevMubarak1/mechmind-ai" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://wa.me/2347010299562" class="btn-primary" target="_blank" rel="noopener">Try on WhatsApp</a>
+  </div>
+
+  <!-- ====== HERO ====== -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <div class="hero-badge-dot"></div>
+        Live on WhatsApp
+      </div>
+      <h1>Smart diagnostics that feel like having an <span class="accent">expert on site.</span></h1>
+      <p class="hero-sub">
+        <strong>One integrated system.</strong> Sensors, AI engine, and WhatsApp — working together. MechMind monitors your heavy equipment in real time and gives mechanics expert-level fault diagnosis. No app to download. Just WhatsApp.
+      </p>
+      <div class="hero-actions">
+        <a href="https://wa.me/2347010299562" class="btn-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Message MechMind
+        </a>
+        <a href="#features" class="btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+          How It Works
+        </a>
+      </div>
+      <div class="hero-partners">
+        <span>Built with</span>
+        <div class="partner-logos">
+          <div class="partner-logo">ESP32</div>
+          <div class="partner-logo">Llama 3.1</div>
+          <div class="partner-logo">FastAPI</div>
+          <div class="partner-logo">PostgreSQL</div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-terminal">
+      <div class="terminal-header">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">mechmind_node — sensor_output.log</span>
+      </div>
+      <div class="terminal-body">
+        <div class="terminal-line"><span class="t-comment">// MechMind Node v1.0 — Live sensor stream</span></div>
+        <div class="terminal-line"><span class="t-prompt">NODE-001 </span><span class="t-output">Connecting to WiFi...</span></div>
+        <div class="terminal-line"><span class="t-prompt">NODE-001 </span><span class="t-success">Connected — 192.168.1.47</span></div>
+        <div class="terminal-line"><span class="t-prompt">NODE-001 </span><span class="t-output">I2S mic initialized (GPIO19/25/32)</span></div>
+        <div class="terminal-line"><span class="t-prompt">NODE-001 </span><span class="t-output">ADXL345 initialized (SPI)</span></div>
+        <div class="terminal-line"><span class="t-prompt">NODE-001 </span><span class="t-output">DS18B20 initialized (GPIO4)</span></div>
+        <div class="terminal-line">&nbsp;</div>
+        <div class="terminal-line"><span class="t-comment">// Streaming to backend...</span></div>
+        <div class="terminal-line"><span class="t-prompt">POST </span><span class="t-key">/api/sensors/data</span></div>
+        <div class="terminal-line">{</div>
+        <div class="terminal-line">&nbsp;&nbsp;<span class="t-key">"node_id"</span>: <span class="t-string">"NODE-001"</span>,</div>
+        <div class="terminal-line">&nbsp;&nbsp;<span class="t-key">"temperature"</span>: <span class="t-value">78.4</span>,</div>
+        <div class="terminal-line">&nbsp;&nbsp;<span class="t-key">"vibration_magnitude"</span>: <span class="t-value">2.31</span>,</div>
+        <div class="terminal-line">&nbsp;&nbsp;<span class="t-key">"sound_level_db"</span>: <span class="t-value">72.8</span>,</div>
+        <div class="terminal-line">&nbsp;&nbsp;<span class="t-key">"timestamp"</span>: <span class="t-string">"2026-09-29T12:00:02Z"</span></div>
+        <div class="terminal-line">}</div>
+        <div class="terminal-line"><span class="t-success">200 OK</span> <span class="t-comment">— stored in mechmind_db</span></div>
+        <div class="terminal-line"><span class="t-prompt">$</span> <span class="cursor-blink"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== ONE PLATFORM ====== -->
+  <section class="one-platform" id="platform">
+    <div class="section-inner fade-in">
+      <div class="section-label"><div class="section-label-dot"></div> One Integrated System</div>
+      <p class="platform-highlight">
+        <strong>Three sensors. One AI engine. WhatsApp delivery.</strong> MechMind is not a chatbot — it is a complete diagnostic system. Hardware monitors the machine. The AI reads technical manuals. The mechanic gets answers where they already are — on WhatsApp.
+      </p>
+      <div class="platform-grid">
+        <!-- Temperature -->
+        <div class="platform-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><path d="M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4.5 4.5 0 1 0 4 0z"/><line x1="12" y1="9" x2="12" y2="3"/></svg></div>
+          <h3>Temperature Monitoring</h3>
+          <p>DS18B20 sensor tracks engine bay and hydraulic fluid temperature. Overheating is the number one cause of equipment failure on construction sites.</p>
+        </div>
+        <!-- Vibration -->
+        <div class="platform-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><path d="M2 12h2l3-9 4 18 4-18 3 9h2"/></svg></div>
+          <h3>Vibration Analysis</h3>
+          <p>ADXL345 accelerometer measures vibration in three axes. Abnormal patterns reveal bearing damage, pump failure, and structural issues before they become catastrophic.</p>
+        </div>
+        <!-- Sound -->
+        <div class="platform-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></div>
+          <h3>Sound Pressure Detection</h3>
+          <p>INMP441 MEMS microphone captures acoustic signatures at 16kHz. Unusual noise patterns indicate cavitation, leaks, and mechanical cracks.</p>
+        </div>
+        <!-- AI -->
+        <div class="platform-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 1 4 4v2H8V6a4 4 0 0 1 4-4z"/><rect x="4" y="8" width="16" height="12" rx="2"/><circle cx="9" cy="14" r="1.5" fill="var(--accent)"/><circle cx="15" cy="14" r="1.5" fill="var(--accent)"/></svg></div>
+          <h3>AI Diagnostic Engine</h3>
+          <p>Llama 3.1 (8B) runs locally — no data leaves the site. The AI searches indexed technical manuals and gives diagnoses grounded entirely in documentation.</p>
+        </div>
+        <!-- WhatsApp -->
+        <div class="platform-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <h3>WhatsApp Interface</h3>
+          <p>No app to install. No login. Mechanics send fault descriptions on WhatsApp and receive structured diagnoses with probable causes and prevention steps.</p>
+        </div>
+        <!-- Dashboard -->
+        <div class="platform-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/></svg></div>
+          <h3>Live Dashboard</h3>
+          <p>Real-time monitoring shows sensor readings, alert history, and equipment health across all connected machines. Built with Chart.js for smooth visualization.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== PROBLEM ====== -->
+  <section class="problem-section">
+    <div class="section-inner fade-in">
+      <div class="section-label"><div class="section-label-dot"></div> The Problem We Solve</div>
+      <h2 class="section-title">For decades, construction sites had two options for diagnostics. <span class="accent">Both were broken.</span></h2>
+      <div class="problem-grid">
+        <div class="problem-card old-way">
+          <div class="problem-card-tag old">The Old Way</div>
+          <h3>Guesswork & Experience</h3>
+          <ul>
+            <li>Mechanics diagnose by ear and gut feeling — leading to misdiagnosis and wasted parts</li>
+            <li>No real-time monitoring — failures only caught when machines break down completely</li>
+            <li>Diagnostic specialists are expensive and rarely available on-site</li>
+            <li>Equipment manuals are thick, disorganized, and never at hand when needed</li>
+            <li>Downtime costs N500K–N2M per day on major construction projects</li>
+          </ul>
+        </div>
+        <div class="problem-card new-way">
+          <div class="problem-card-tag new">The MechMind Way</div>
+          <h3>AI-Powered, Real-Time, On WhatsApp</h3>
+          <ul>
+            <li>Sensors catch problems before they become breakdowns — temperature spikes, vibration anomalies, abnormal sounds</li>
+            <li>AI reads your technical manuals so the mechanic doesn't have to flip through 300 pages</li>
+            <li>Structured diagnosis delivered on WhatsApp in under 2 minutes — causes ranked by likelihood</li>
+            <li>If MechMind doesn't know the answer, it says so — no dangerous guesses</li>
+            <li>One sensor unit per machine. No recurring specialist fees. Expertise on demand.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== FEATURES ====== -->
+  <section class="features-section" id="features">
+    <div class="section-inner">
+      <div class="features-header fade-in">
+        <div class="section-label"><div class="section-label-dot"></div> How It Works</div>
+        <h2 class="section-title">For the first time, <span class="accent">expert diagnostics</span> meet on-site simplicity.</h2>
+        <p class="section-desc">Three components working together — sensor hardware on the machine, an AI engine that reads your manuals, and WhatsApp as the delivery layer.</p>
+      </div>
+
+      <!-- Feature 1: WhatsApp -->
+      <div class="feature-showcase fade-in" id="demo">
+        <div class="feature-text">
+          <h3>Send a message. Get a diagnosis.</h3>
+          <p>No app. No login. A mechanic describes the fault on WhatsApp — in their own words. MechMind identifies the query type, searches indexed technical documentation, cross-references live sensor data, and returns a structured diagnosis grounded entirely in the manuals.</p>
+          <div class="feature-stats">
+            <div class="feature-stat"><div class="feature-stat-value">&lt;5s</div><div class="feature-stat-label">General queries</div></div>
+            <div class="feature-stat"><div class="feature-stat-value">~90s</div><div class="feature-stat-label">Full AI diagnosis</div></div>
+            <div class="feature-stat"><div class="feature-stat-value">6</div><div class="feature-stat-label">Indexed manuals</div></div>
+          </div>
+        </div>
+        <div class="feature-visual">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+            <span class="terminal-title">WhatsApp — MechMind AI</span>
+          </div>
+          <div class="wa-chat">
+            <div class="wa-message sent">SPN 100 FMI 1 red STOP lamp engine lost power<div class="wa-time">12:01 PM</div></div>
+            <div class="wa-message received">
+              <div class="wa-name">MechMind AI</div>
+              <strong>SPN 100 / FMI 1 — Engine Oil Pressure</strong><br><br>
+              <strong>Probable Causes (ranked):</strong><br>
+              1. Critically low engine oil level<br>2. Oil pump failure or wear<br>3. Blocked oil filter/pickup screen<br>4. Oil pressure sensor fault<br><br>
+              <strong>Immediate Action:</strong><br>SHUT DOWN ENGINE IMMEDIATELY. Do not restart until oil level and pressure are verified.<br><br>
+              <strong>Inspection:</strong><br>
+              - Check oil dipstick level<br>- Inspect for visible leaks<br>- Check oil filter condition
+              <div class="wa-time">12:02 PM</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 2: Sensors -->
+      <div class="feature-showcase reverse fade-in">
+        <div class="feature-text">
+          <h3>Real-time monitoring. Zero guesswork.</h3>
+          <p>Every two seconds, the ESP32 sensor unit reads temperature, vibration, and sound — and pushes the data to the backend over WiFi. When a reading crosses a threshold, the system triggers an alert immediately.</p>
+          <div class="feature-stats">
+            <div class="feature-stat"><div class="feature-stat-value">2s</div><div class="feature-stat-label">Update interval</div></div>
+            <div class="feature-stat"><div class="feature-stat-value">3</div><div class="feature-stat-label">Sensor types</div></div>
+            <div class="feature-stat"><div class="feature-stat-value">43K</div><div class="feature-stat-label">Readings/day</div></div>
+          </div>
+        </div>
+        <div class="feature-visual">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+            <span class="terminal-title">live_telemetry — NODE-001</span>
+          </div>
+          <div class="sensor-display">
+            <div class="sensor-row">
+              <div class="sensor-info">
+                <div class="sensor-icon temp"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4.5 4.5 0 1 0 4 0z"/></svg></div>
+                <div><div class="sensor-name">Temperature</div><div class="sensor-detail">Engine bay — DS18B20</div></div>
+              </div>
+              <div class="sensor-value normal">78.4 C</div>
+              <div class="sensor-status ok">Normal</div>
+            </div>
+            <div class="sensor-row">
+              <div class="sensor-info">
+                <div class="sensor-icon vib"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2l3-9 4 18 4-18 3 9h2"/></svg></div>
+                <div><div class="sensor-name">Vibration</div><div class="sensor-detail">3-axis — ADXL345</div></div>
+              </div>
+              <div class="sensor-value warn">4.72g</div>
+              <div class="sensor-status warning-s">Warning</div>
+            </div>
+            <div class="sensor-row">
+              <div class="sensor-info">
+                <div class="sensor-icon sound"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
+                <div><div class="sensor-name">Sound Level</div><div class="sensor-detail">16kHz — INMP441</div></div>
+              </div>
+              <div class="sensor-value normal">72.8 dB</div>
+              <div class="sensor-status ok">Normal</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== DASHBOARD ====== -->
+  <section class="dashboard-section">
+    <div class="section-inner fade-in">
+      <div class="section-label"><div class="section-label-dot"></div> Live Dashboard</div>
+      <h2 class="section-title">Manage your fleet with a <span class="accent">single, unified interface.</span></h2>
+      <p class="section-desc">Monitor all connected equipment from one screen. Real-time readings, alert history, AI diagnostics — all in one place.</p>
+      <div class="dashboard-preview">
+        <div class="dashboard-tabs">
+          <button class="dashboard-tab active" data-tab="overview">overview</button>
+          <button class="dashboard-tab" data-tab="sensors">sensors</button>
+          <button class="dashboard-tab" data-tab="alerts">alerts</button>
+          <button class="dashboard-tab" data-tab="diagnostics">diagnostics</button>
+        </div>
+        <!-- Overview tab -->
+        <div class="tab-content active" id="tab-overview">
+          <div class="dashboard-metrics">
+            <div class="metric-card"><div class="metric-label">Equipment Online</div><div class="metric-value green">3/3</div><div class="metric-change">All nodes active</div></div>
+            <div class="metric-card"><div class="metric-label">Avg Temperature</div><div class="metric-value accent">78.4 C</div><div class="metric-change">Within threshold</div></div>
+            <div class="metric-card"><div class="metric-label">Active Alerts</div><div class="metric-value yellow">2</div><div class="metric-change">1 resolved today</div></div>
+            <div class="metric-card"><div class="metric-label">Readings Today</div><div class="metric-value white">43,200</div><div class="metric-change">Stream healthy</div></div>
+          </div>
+        </div>
+        <!-- Sensors tab -->
+        <div class="tab-content" id="tab-sensors">
+          <div class="dashboard-metrics">
+            <div class="metric-card"><div class="metric-label">NODE-001 Temp</div><div class="metric-value accent">78.4 C</div><div class="metric-change">Excavator CAT 320</div></div>
+            <div class="metric-card"><div class="metric-label">NODE-001 Vib</div><div class="metric-value yellow">4.72g</div><div class="metric-change">Warning threshold</div></div>
+            <div class="metric-card"><div class="metric-label">NODE-002 Temp</div><div class="metric-value green">65.1 C</div><div class="metric-change">Loader XCMG LW500</div></div>
+            <div class="metric-card"><div class="metric-label">NODE-003 Sound</div><div class="metric-value green">68.3 dB</div><div class="metric-change">Crane Zoomlion</div></div>
+          </div>
+        </div>
+        <!-- Alerts tab -->
+        <div class="tab-content" id="tab-alerts">
+          <div class="tab-log">
+            <div class="tab-log-line"><span class="tab-log-time">12:04:22</span><span class="tab-log-type warn">WARNING</span><span class="tab-log-msg">NODE-001 vibration_magnitude 4.72g exceeds threshold 4.50g</span></div>
+            <div class="tab-log-line"><span class="tab-log-time">11:58:10</span><span class="tab-log-type crit">CRITICAL</span><span class="tab-log-msg">NODE-002 temperature 106.2C exceeds critical threshold 100.0C</span></div>
+            <div class="tab-log-line"><span class="tab-log-time">11:45:33</span><span class="tab-log-type info">RESOLVED</span><span class="tab-log-msg">NODE-003 sound_level_db returned to normal (82.1 dB)</span></div>
+            <div class="tab-log-line"><span class="tab-log-time">10:22:01</span><span class="tab-log-type warn">WARNING</span><span class="tab-log-msg">NODE-003 sound_level_db 97.4 dB exceeds threshold 85.0 dB</span></div>
+            <div class="tab-log-line"><span class="tab-log-time">09:15:44</span><span class="tab-log-type info">RESOLVED</span><span class="tab-log-msg">NODE-001 temperature returned to normal (79.3C)</span></div>
+          </div>
+        </div>
+        <!-- Diagnostics tab -->
+        <div class="tab-content" id="tab-diagnostics">
+          <div class="tab-log">
+            <div class="tab-log-line"><span class="tab-log-time">12:02:15</span><span class="tab-log-type warn">RAG</span><span class="tab-log-msg">Query: "SPN 100 FMI 1" — 4 docs retrieved — Diagnosis: Engine oil pressure critically low</span></div>
+            <div class="tab-log-line"><span class="tab-log-time">11:30:08</span><span class="tab-log-type info">GENERAL</span><span class="tab-log-msg">Query: "what do you think about CAT" — Answered from general knowledge (no manuals)</span></div>
+            <div class="tab-log-line"><span class="tab-log-time">10:45:22</span><span class="tab-log-type crit">RAG</span><span class="tab-log-msg">Query: "hydraulic pressure dropping SANY SY215C" — 6 docs retrieved — Full diagnosis sent</span></div>
+            <div class="tab-log-line"><span class="tab-log-time">09:20:11</span><span class="tab-log-type info">REFUSAL</span><span class="tab-log-msg">Query: "CAT error 105" — No matching docs — Honest refusal sent with OEM recommendation</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== CAPABILITIES ====== -->
+  <section class="capabilities-section">
+    <div class="section-inner fade-in">
+      <div class="section-label"><div class="section-label-dot"></div> Purpose-Built</div>
+      <h2 class="section-title">Purpose-built for <span class="accent">construction site</span> realities.</h2>
+      <p class="section-desc">Designed for the way mechanics actually work — not how engineers wish they would.</p>
+      <div class="capabilities-grid">
+        <div class="capability-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <h3>WhatsApp-Native</h3>
+          <p>No app download. No training. Every mechanic already has WhatsApp. That's the interface.</p>
+        </div>
+        <div class="capability-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <h3>On-Premise AI</h3>
+          <p>Llama 3.1 runs entirely on your hardware. Zero data sent to external APIs. Your diagnostic data stays on-site.</p>
+        </div>
+        <div class="capability-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></div>
+          <h3>No Hallucinations</h3>
+          <p>If MechMind doesn't have the answer in its indexed manuals, it says "I don't know." No guesses. Safety first.</p>
+        </div>
+        <div class="capability-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+          <h3>Real-Time Alerts</h3>
+          <p>Threshold-based alerting triggers instantly when readings cross safe limits. Get notified before the breakdown.</p>
+        </div>
+        <div class="capability-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+          <h3>RAG Knowledge Base</h3>
+          <p>6 indexed technical manuals — J1939 fault codes, hydraulic troubleshooting, diesel powertrain, safety procedures.</p>
+          <div class="capability-code"><span class="t-comment">// Knowledge base</span>
+SAE J1939 Fault Codes
+Hydraulic Systems Guide
+Diesel Powertrain Manual
+Vibration Thresholds
+Safety Procedures
+Maintenance Schedules</div>
+        </div>
+        <div class="capability-card">
+          <div class="icon-box"><svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg></div>
+          <h3>Open Source</h3>
+          <p>Full codebase on GitHub. Firmware, backend, dashboard, WhatsApp bot — everything is transparent and auditable.</p>
+          <div class="capability-code"><span class="t-prompt">$</span> git clone github.com/
+    DevMubarak1/mechmind-ai
+<span class="t-success">Cloned successfully</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== HARDWARE ====== -->
+  <section class="hardware-section" id="hardware">
+    <div class="section-inner fade-in">
+      <div class="section-label"><div class="section-label-dot"></div> Hardware</div>
+      <h2 class="section-title">The sensor node. <span class="accent">Compact. Wireless. Always on.</span></h2>
+      <p class="section-desc">Each machine gets one unit — physically attached. Three sensors, one microcontroller, WiFi connectivity. Reads and transmits every 2 seconds.</p>
+      <div class="hardware-grid">
+        <div class="hardware-specs">
+          <div class="spec-row"><span class="spec-label">Microcontroller</span><span class="spec-value">ESP32-WROOM-32</span></div>
+          <div class="spec-row"><span class="spec-label">Temperature Sensor</span><span class="spec-value">DS18B20</span></div>
+          <div class="spec-row"><span class="spec-label">Accelerometer</span><span class="spec-value">ADXL345 (SPI)</span></div>
+          <div class="spec-row"><span class="spec-label">Microphone</span><span class="spec-value">INMP441 (I2S)</span></div>
+          <div class="spec-row"><span class="spec-label">Connectivity</span><span class="spec-value">WiFi 802.11 b/g/n</span></div>
+          <div class="spec-row"><span class="spec-label">Power Draw</span><span class="spec-value">~0.5W active</span></div>
+          <div class="spec-row"><span class="spec-label">Sample Rate</span><span class="spec-value">Every 2 seconds</span></div>
+          <div class="spec-row"><span class="spec-label">Data Protocol</span><span class="spec-value">JSON / HTTP POST</span></div>
+        </div>
+        <div class="model-container">
+          <div class="hardware-tabs">
+            <button class="hw-tab active" data-hw="diagram">Assembly Diagram</button>
+            <button class="hw-tab" data-hw="model3d">3D Model</button>
+          </div>
+          <div class="hw-content active" id="hw-diagram">
+            <img src="assembly_diagram.jpg" alt="MechMind AI Sensor Node v1.0 — Exploded Assembly Diagram" style="width:100%; display:block;">
+          </div>
+          <div class="hw-content" id="hw-model3d">
+            <model-viewer
+              src="sensor_node.glb"
+              alt="MechMind AI Sensor Node 3D Model"
+              auto-rotate
+              camera-controls
+              touch-action="pan-y"
+              shadow-intensity="1"
+              shadow-softness="0.5"
+              exposure="1.2"
+              environment-image="neutral"
+              style="background-color: #141414; width:100%; height:450px;"
+            ></model-viewer>
+          </div>
+          <div class="model-label">MechMind Sensor Node v1.0 — Click "3D Model" to interact</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== ACCURACY ====== -->
+  <section class="accuracy-section" id="accuracy">
+    <div class="section-inner fade-in">
+      <div class="section-label" style="justify-content:center;"><div class="section-label-dot"></div> Benchmarked & Verified</div>
+      <div class="accuracy-number">75%</div>
+      <div class="accuracy-label">Diagnostic Accuracy on Blind Test</div>
+      <p class="accuracy-desc">56 test questions — ranging from specific fault codes to tricky edge cases — every answer checked by hand. The remaining 25% are honest refusals, not confident wrong answers. Safety by design.</p>
+      <div class="accuracy-bar-container">
+        <div class="accuracy-bar-bg"><div class="accuracy-bar-fill" id="accuracyBar"></div></div>
+        <div class="accuracy-legend"><span>0%</span><span>42 correct / 56 total</span><span>100%</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== CTA ====== -->
+  <section class="cta-section">
+    <div class="section-inner fade-in">
+      <div class="section-label" style="justify-content:center;"><div class="section-label-dot"></div> Get Started</div>
+      <h2 class="section-title" style="max-width:700px;">Modernize your equipment diagnostics.<br><span class="accent">Talk to MechMind.</span></h2>
+      <p class="section-desc" style="max-width:500px;">Send a fault description on WhatsApp right now. Or explore the full codebase on GitHub. MechMind is live and ready.</p>
+      <div class="cta-actions">
+        <a href="https://wa.me/2347010299562" class="btn-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Try on WhatsApp
+        </a>
+        <a href="https://github.com/DevMubarak1/mechmind-ai" class="btn-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== FOOTER ====== -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand"><span class="mech">Mech</span><span class="mind">Mind</span></div>
+      <ul class="footer-links">
+        <li><a href="#platform">Platform</a></li>
+        <li><a href="#features">How It Works</a></li>
+        <li><a href="#hardware">Hardware</a></li>
+        <li><a href="https://github.com/DevMubarak1/mechmind-ai" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://wa.me/2347010299562" target="_blank" rel="noopener">WhatsApp</a></li>
+      </ul>
+      <div class="footer-copy">2026 MechMind AI — Pullup Events (CAC: BN-9846744)</div>
+    </div>
+  </footer>
+
+  <script>
+    // ====== MOBILE MENU ======
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileNav = document.getElementById('mobileNav');
+    const menuIcon = document.getElementById('menuIcon');
+
+    mobileMenuBtn.addEventListener('click', () => {
+      const isOpen = mobileNav.classList.toggle('open');
+      menuIcon.innerHTML = isOpen
+        ? '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
+        : '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>';
+    });
+
+    // Close mobile nav on link click
+    mobileNav.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        mobileNav.classList.remove('open');
+        menuIcon.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>';
+      });
+    });
+
+    // ====== SMOOTH SCROLL for all anchor links ======
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const targetId = this.getAttribute('href');
+        if (targetId === '#') return;
+        const target = document.querySelector(targetId);
+        if (target) {
+          e.preventDefault();
+          const offset = 80; // navbar height
+          const y = target.getBoundingClientRect().top + window.pageYOffset - offset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      });
+    });
+
+    // ====== DASHBOARD TABS ======
+    const tabs = document.querySelectorAll('.dashboard-tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Remove active from all
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        // Activate clicked
+        tab.classList.add('active');
+        const targetTab = document.getElementById('tab-' + tab.dataset.tab);
+        if (targetTab) targetTab.classList.add('active');
+      });
+    });
+
+    // ====== SCROLL ANIMATIONS ======
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          // Accuracy bar
+          const bar = entry.target.querySelector('#accuracyBar');
+          if (bar) setTimeout(() => { bar.style.width = '75%'; }, 300);
+        }
+      });
+    }, { threshold: 0.15 });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // ====== NAVBAR SCROLL EFFECT ======
+    window.addEventListener('scroll', () => {
+      const navbar = document.getElementById('navbar');
+      navbar.style.borderBottomColor = window.pageYOffset > 100
+        ? 'rgba(255,107,43,0.15)'
+        : '#222';
+    });
+    // ====== HARDWARE TABS (Diagram / 3D Model) ======
+    const hwTabs = document.querySelectorAll('.hw-tab');
+    const hwContents = document.querySelectorAll('.hw-content');
+
+    hwTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        hwTabs.forEach(t => t.classList.remove('active'));
+        hwContents.forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        const target = document.getElementById('hw-' + tab.dataset.hw);
+        if (target) target.classList.add('active');
+      });
+    });
+  </script>
+
+</body>
+</html>
