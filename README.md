@@ -321,11 +321,11 @@ A terminal QR code will be generated. Scan it with WhatsApp on any mobile device
 
 ## Project Documentation and Artifacts
 
-Comprehensive competition and technical dossiers are preserved directly within this repository:
+Comprehensive engineering documentation, specifications, and presentation materials are preserved directly within this repository:
 
 - **[Live Web Telemetry Dashboard](https://mechmind-ng.vercel.app)**: Real-time public demonstration portal.
 - **[System Architecture Reference (Markdown)](docs/SYSTEM_ARCHITECTURE.md)**: Exhaustive engineering breakdown covering data schemas, free-space damping, thermal dissipation, and fail-safes.
-- **[Executive Pitch Deck (PDF)](docs/MechMind_AI_Pitch_Deck.pdf)**: 9-slide investor, competition, and UN ECA presentation deck.
+- **[Executive Pitch Deck (PDF)](docs/MechMind_AI_Pitch_Deck.pdf)**: 9-slide master executive and investor pitch deck.
 - **[Technical Specifications & Budget Dossier (PDF)](docs/MechMind_AI_Technical_Specs.pdf)**: 7-page comprehensive specification, BOM, component cost breakdown, and certification path.
 
 ---
@@ -355,4 +355,5 @@ MechMind AI directly contributes to key United Nations Sustainable Development G
 
 ## License and Intellectual Property
 
-Copyright (c) 2026 MechMind AI Engineering Team. Developed for the 15th China Innovation & Entrepreneurship Competition, the UN ECA AfIGF Innovation Café, and the Student Venture Capital Grant (SVCG) initiative. All rights reserved.
+Copyright (c) 2026 MechMind AI Engineering Team. All rights reserved.
+
