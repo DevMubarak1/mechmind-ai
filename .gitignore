@@ -9,6 +9,9 @@ __pycache__/
 *.jpg
 *.jpeg
 *.png
+!docs/*.jpg
+!docs/*.jpeg
+!docs/*.png
 .venv/
 chroma_data/
 pgdata/
