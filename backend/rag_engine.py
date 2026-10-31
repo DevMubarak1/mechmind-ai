@@ -17,7 +17,7 @@ import ollama
 logger = logging.getLogger("mechmind.rag")
 
 CHROMA_URL = os.getenv("CHROMA_URL", "http://localhost:8100")
-OLLAMA_MODEL = "llama3.1:8b"
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma2:2b")
 KNOWLEDGE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "knowledge"))
 COLLECTION_NAME = "mechmind_machinery_knowledge"
 
@@ -531,7 +531,7 @@ def clean_response(text: str) -> str:
 
 def _call_ollama(system_prompt: str, user_prompt: str, max_tokens: int = 200) -> str:
     """Shared Ollama inference — llama3.1:8b with optimized token budget for local GPU/CPU."""
-    model_name = "llama3.1:8b"
+    model_name = OLLAMA_MODEL
     try:
         response = ollama.chat(
             model=model_name,
@@ -561,7 +561,7 @@ def _call_ollama_prefill(system_prompt: str, user_prompt: str, prefill: str) -> 
     defaulting to its trained header structure (PROBABLE CAUSES: / IMMEDIATE ACTIONS:).
     The model continues from `prefill` rather than generating from scratch.
     """
-    model_name = "llama3.1:8b"
+    model_name = OLLAMA_MODEL
     try:
         response = ollama.chat(
             model=model_name,
