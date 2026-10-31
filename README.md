@@ -7,11 +7,11 @@
 [![Track: Best Use of Gemma](https://img.shields.io/badge/Track-Best_Use_of_Gemma-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/gemma)
 [![Track: Best Open-Source AI](https://img.shields.io/badge/Track-Best_Open--Source_AI-10B981?style=for-the-badge&logo=opensourceinitiative)](LICENSE)
 
-[![Status](https://img.shields.io/badge/Hardware_Status-Physical_Node_Operational-success.svg)](#prototype-device-and-hardware-architecture)
+[![Status](https://img.shields.io/badge/Hardware_Status-Physical_Node_Operational-success.svg)](#prototype-device--hardware-architecture)
 [![AI Engine](https://img.shields.io/badge/AI_Engine-Google_Gemma_2_%2B_ChromaDB_RAG-blue.svg)](#how-google-gemma-powers-mechmind-diagnostics)
 [![Dashboard](https://img.shields.io/badge/Live_Dashboard-mechmind--ng.vercel.app-blue.svg)](https://mechmind-ng.vercel.app)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32_%2B_ADXL345_%2B_DS18B20-orange.svg)](#edge-sensor-node-specifications)
-[![Field Interface](https://img.shields.io/badge/Field_Interface-WhatsApp_Copilot-25D366.svg)](#field-interfaces-and-technician-access)
+[![Field Interface](https://img.shields.io/badge/Field_Interface-WhatsApp_Copilot-25D366.svg)](#field-interfaces-zero-friction-delivery)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -23,6 +23,15 @@
 
 ---
 
+## 📸 MechMind AI in Action: Visual Showcase
+
+<div align="center">
+  <img src="docs/images/prototype_device.jpg" alt="MechMind AI Edge Telemetry Node Prototype" width="850px" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+  <p><em>The MechMind AI Physical Edge Node (NODE-001): Ruggedized non-invasive sensor enclosure equipped with ESP32 dual-core MCU, ADXL345 3-axis accelerometer, DS18B20 digital thermal probe, and high-coercivity N52 neodymium magnetic mount.</em></p>
+</div>
+
+---
+
 ## 📑 Table of Contents
 
 - [Executive Overview](#executive-overview)
@@ -30,11 +39,13 @@
 - [System Architecture](#system-architecture)
 - [How Google Gemma Powers MechMind Diagnostics](#how-google-gemma-powers-mechmind-diagnostics)
 - [Prototype Device & Hardware Architecture](#prototype-device--hardware-architecture)
+  - [Hardware Gallery & Physical Node Views](#hardware-gallery--physical-node-views)
+  - [CAD & Electrical Schematics](#cad--electrical-schematics)
   - [Verified Hardware Specifications](#verified-hardware-specifications)
   - [Edge Signal Processing & Bandwidth Efficiency](#edge-signal-processing--bandwidth-efficiency)
 - [Field Interfaces: Zero-Friction Delivery](#field-interfaces-zero-friction-delivery)
-  - [1. WhatsApp Mobile Diagnostic Copilot](#1-whatsapp-mobile-diagnostic-copilot)
-  - [2. Live Fleet Telemetry Console](#2-live-fleet-telemetry-console)
+  - [1. Live Fleet Telemetry Console](#1-live-fleet-telemetry-console)
+  - [2. WhatsApp Mobile Diagnostic Copilot](#2-whatsapp-mobile-diagnostic-copilot)
 - [56-Case Blind Diagnostic Benchmark](#56-case-blind-diagnostic-benchmark)
 - [Repository Structure](#repository-structure)
 - [Quickstart: Running with Google Gemma](#quickstart-running-with-google-gemma)
@@ -121,9 +132,23 @@ MechMind utilizes **Google Gemma 2** as its primary diagnostic brain:
 
 ## Prototype Device & Hardware Architecture
 
-### Verified Hardware Specifications
+### Hardware Gallery & Physical Node Views
 
-The physical edge telemetry node (**NODE-001**) is assembled from locally accessible components packaged in a custom 3D-printed PETG enclosure embedded with four high-coercivity N52 neodymium magnets for tool-free attachment to engine blocks and pump casings:
+The physical edge telemetry node (**NODE-001**) is built for harsh field environments (dust, oil mist, high vibration, extreme ambient heat).
+
+| Open Enclosure & Internal Circuitry | Enclosed 3D-Printed Field Housing | Angled Profile & Connector Ports |
+| :---: | :---: | :---: |
+| <img src="docs/images/hardware_prototype_open.jpg" width="280px" alt="Internal Circuitry and Wiring" /> | <img src="docs/images/hardware_prototype_enclosed.jpg" width="280px" alt="Rugged 3D Enclosure" /> | <img src="docs/images/hardware_prototype_angle.jpg" width="280px" alt="Connector Ports and Profile" /> |
+| *Internal layout: ESP32 MCU, 18650 cell, TP4056 charger, MT3608 boost rail, and wiring loom.* | *Weather-resistant PETG housing with magnetic base for rapid 30-second machine clamping.* | *Charging access, sensor breakout wiring, and compact hand-held form factor.* |
+
+### CAD & Electrical Schematics
+
+| 3D Exploded Sensor Node Assembly | ESP32 Sensor Interfacing Pinout |
+| :---: | :---: |
+| <img src="docs/images/sensor_node_assembly_diagram.jpg" width="430px" alt="Sensor Node Assembly Diagram" /> | <img src="docs/images/esp32_pinout.png" width="430px" alt="ESP32 Sensor Pinout" /> |
+| *Exploded CAD diagram illustrating component stacking, battery bay, and magnetic coupling.* | *GPIO assignments for ADXL345 (I2C: GPIO 21/22), DS18B20 (1-Wire: GPIO 4), and INMP441 (I2S).* |
+
+### Verified Hardware Specifications
 
 | Subsystem | Component & Specification | Role in MechMind |
 | :--- | :--- | :--- |
@@ -147,19 +172,29 @@ To operate reliably over weak rural 2G/3G networks, MechMind extracts statistica
 
 ## Field Interfaces: Zero-Friction Delivery
 
-### 1. WhatsApp Mobile Diagnostic Copilot
-* **Demonstration Line**: `+234 701 029 9562`
-* **Technologies**: Baileys WebSockets WhatsApp Framework + faster-whisper local STT + Google Gemma 2.
-* **Why WhatsApp?**: In African industrial environments, WhatsApp is universal. Technicians wearing greasy gloves can send voice notes in English, Hausa, or Yoruba, ask questions, and receive actionable repair steps with torque specifications.
+### 1. Live Fleet Telemetry Console
 
-### 2. Live Fleet Telemetry Console
-* **Public Dashboard**: [https://mechmind-ng.vercel.app](https://mechmind-ng.vercel.app)
-* **Local Dashboard**: `http://localhost:8080`
-* **Features**:
-  * Real-time 3-axis kinematic vibration tracking (X, Y, Z acceleration waveforms).
-  * Acoustic decibel pressure meter and thermal rate-of-rise trend monitoring.
-  * Multi-asset switching (CAT Excavators, SANY Excavators, Farm Tractors, Diesel Generators).
-  * Dynamic Machine Health Score index (0% - 100%) with automated status flags (Normal, Caution, Critical).
+The centralized management console provides operators and maintenance directors with live operational visibility. The interface polls telemetry **every 2 seconds** and receives sub-second Server-Sent Events (SSE) for critical alerts.
+
+* **Public Web Portal**: [https://mechmind-ng.vercel.app](https://mechmind-ng.vercel.app)
+* **Local Edge Dashboard**: `http://localhost:8080`
+
+| Real-Time Kinematic Waveform Monitor | Automated Alert Thresholds & Diagnostics Feed |
+| :---: | :---: |
+| <img src="docs/images/dashboard_live_telemetry.png" width="430px" alt="Live Telemetry Dashboard Waveforms" /> | <img src="docs/images/dashboard_alerts_log.png" width="430px" alt="Dashboard Active Alerts Log" /> |
+| *Tri-axial vibration (X, Y, Z), temperature rate-of-rise (dT/dt), and acoustic pressure updated every 2 seconds.* | *Automatic threshold violation logs paired with instant, OEM-grounded Google Gemma 2 recommendations.* |
+
+### 2. WhatsApp Mobile Diagnostic Copilot
+
+Because WhatsApp is universally used by mechanics and fleet operators across Africa, MechMind offers a zero-friction mobile interface powered by **Baileys WebSockets + Google Gemma 2**.
+
+* **Live Dedicated Gateway**: `+234 701 029 9562`
+* **Zero-Friction Access**: No mobile apps to download, zero software training required.
+
+| 1. WhatsApp Pairing via Dashboard | 2. Real-Time Telemetry Queries | 3. Step-by-Step OEM Repair Guidance | 4. Multimodal Visual Inspection |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/images/whatsapp_device_pairing.png" width="210px" alt="WhatsApp Device Pairing" /> | <img src="docs/images/whatsapp_telemetry_query.jpg" width="210px" alt="WhatsApp Telemetry Query" /> | <img src="docs/images/whatsapp_repair_guidance.jpg" width="210px" alt="WhatsApp Repair Guidance" /> | <img src="docs/images/whatsapp_image_diagnosis.jpg" width="210px" alt="WhatsApp Image Diagnosis" /> |
+| *Single-click QR authentication directly within the fleet dashboard.* | *Mechanics text natural questions to inspect live operating temperature and vibration.* | *Gemma 2 outputs exact tools, wrench sizes, and sequential repair checklists.* | *Technicians snap photos of worn parts for instant diagnostic identification.* |
 
 ---
 
@@ -198,19 +233,19 @@ mechmind-ai/
 │
 ├── dashboard/                      # Next.js / Static Live Telemetry Web Console
 │   ├── index.html                  # Standalone live telemetry dashboard
-│   ├── app.js                      # Real-time Chart.js kinematic waveform visualizer
+│   ├── app.js                      # Real-time Chart.js kinematic waveform visualizer (2s refresh)
 │   └── style.css                   # Industrial dashboard theme
 │
 ├── whatsapp-bot/                   # WhatsApp Field Assistant Gateway
 │   ├── index.js                    # Baileys WhatsApp client & message dispatcher
 │   └── package.json                # Node.js dependencies
 │
-├── docs/                           # Official Technical Dossiers & Proposals
+├── docs/                           # Official Technical Dossiers & Presentation Guides
+│   ├── images/                     # Comprehensive hardware photos & interface screenshots
+│   ├── MechMind_AI_MLH_Hack_Day_Presenter_Guide.pdf # Official Pitch & Defense Playbook
 │   ├── MechMind_AI_Project_Synopsis_AGRA_SMEDAN.pdf # AGRA-SMEDAN Agri-Tech Dossier
 │   ├── MechMind_AI_Project_Synopsis_NAP2026.pdf     # National Automation Prize Dossier
-│   ├── MechMind_AI_Pitch_Deck.pdf  # Executive & Competition Pitch Deck
-│   ├── MechMind_AI_Prototype.jpg   # Physical prototype photograph
-│   └── Sensor_Node_Assembly_Diagram.jpg # Complete wiring & electrical schematic
+│   └── SYSTEM_ARCHITECTURE.md      # Exhaustive engineering specification
 │
 ├── docker-compose.yml              # PostgreSQL 16 & ChromaDB container orchestration
 ├── LICENSE                         # Open-source MIT License
@@ -254,7 +289,7 @@ cd ../whatsapp-bot
 npm install
 node index.js
 ```
-Scan the terminal QR code with WhatsApp to link the diagnostic assistant.
+Scan the terminal QR code or use the Web Dashboard WhatsApp modal to link the diagnostic assistant.
 
 ---
 

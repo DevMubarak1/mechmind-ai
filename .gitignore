@@ -12,6 +12,7 @@ __pycache__/
 !docs/*.jpg
 !docs/*.jpeg
 !docs/*.png
+!docs/images/*
 .venv/
 chroma_data/
 pgdata/
