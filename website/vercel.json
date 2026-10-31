@@ -1,8 +1,8 @@
 {
   "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
     { "source": "/dashboard", "destination": "/dashboard/index.html" },
-    { "source": "/dashboard/(.*)", "destination": "/dashboard/$1" }
+    { "source": "/dashboard/", "destination": "/dashboard/index.html" }
   ]
 }
-
