@@ -37,6 +37,7 @@ let sock = null;
 let latestQR = null;
 let latestPairingCode = null;
 const sentBotMessageIds = new Set();
+const messageStore = new Map();
 
 // ========================
 // WhatsApp Connection
@@ -67,6 +68,11 @@ async function startBot() {
         connectTimeoutMs: 60000,
         defaultQueryTimeoutMs: 60000,
         keepAliveIntervalMs: 25000,
+        syncFullHistory: false,
+        getMessage: async (key) => {
+            const msg = messageStore.get(key.id);
+            return msg?.message || undefined;
+        }
     });
 
     // Handle connection updates
@@ -111,6 +117,15 @@ async function startBot() {
     // Handle incoming messages
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         console.log(`[DEBUG] messages.upsert event fired. type=${type}, count=${messages.length}`);
+        for (const m of messages) {
+            if (m.key?.id) {
+                messageStore.set(m.key.id, m);
+                if (messageStore.size > 2000) {
+                    const firstKey = messageStore.keys().next().value;
+                    messageStore.delete(firstKey);
+                }
+            }
+        }
         if (type !== 'notify') {
             console.log(`[DEBUG] Skipping non-notify type: ${type}`);
             return;
@@ -118,7 +133,7 @@ async function startBot() {
 
         for (const msg of messages) {
             if (!msg.message) {
-                console.log(`[DEBUG] Skipping msg with no .message property. key=${JSON.stringify(msg.key)}`);
+                console.log(`[DEBUG] No .message. Full msg keys: ${Object.keys(msg).join(', ')} | msg: ${JSON.stringify(msg)}`);
                 continue;
             }
             // Ignore messages sent by our bot

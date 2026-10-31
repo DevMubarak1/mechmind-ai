@@ -1,0 +1,81 @@
+version: '3.8'
+
+# DigitalOcean Production Deployment Stack for MechMind AI
+# Built for Hacktoberfest 2026 Open-Source AI Prize Challenge
+# Deploy on a DigitalOcean Droplet (Ubuntu 24.04 / Docker 1-Click)
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mechmind_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mechmind_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mechmind_secure_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-mechmind}
+    volumes:
+      - do_pgdata:/var/lib/postgresql/data
+    networks:
+      - mechmind_net
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: mechmind_chromadb
+    restart: always
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+    volumes:
+      - do_chromadata:/chroma/chroma
+    ports:
+      - "8100:8000"
+    networks:
+      - mechmind_net
+
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: mechmind_api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mechmind_user}:${POSTGRES_PASSWORD:-mechmind_secure_pass_2026}@db:5432/${POSTGRES_DB:-mechmind}
+      - CHROMA_URL=http://chroma:8000
+      - OLLAMA_MODEL=gemma2:2b
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - WHATSAPP_BOT_URL=http://whatsapp-bot:3001
+    depends_on:
+      - db
+      - chroma
+    networks:
+      - mechmind_net
+
+  whatsapp-bot:
+    build:
+      context: ../../whatsapp-bot
+      dockerfile: Dockerfile
+    container_name: mechmind_whatsapp
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - BACKEND_URL=http://backend:8080
+      - BOT_PORT=3001
+      - ALERT_RECIPIENTS=${ALERT_RECIPIENTS:-2347010299562}
+    volumes:
+      - do_auth_info:/app/auth_info
+    depends_on:
+      - backend
+    networks:
+      - mechmind_net
+
+volumes:
+  do_pgdata:
+  do_chromadata:
+  do_auth_info:
+
+networks:
+  mechmind_net:
+    driver: bridge

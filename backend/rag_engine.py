@@ -529,8 +529,45 @@ def clean_response(text: str) -> str:
     return clean_for_whatsapp(strip_emojis(text))
 
 
+def _call_gemini_api(system_prompt: str, user_prompt: str, max_tokens: int = 300) -> Optional[str]:
+    """Call Google Gemini / Gemma API endpoints via Google AI Studio."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    try:
+        import urllib.request
+        import json
+        model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        payload = {
+            "contents": [
+                {"role": "user", "parts": [{"text": f"{system_prompt}\n\nUser Query: {user_prompt}"}]}
+            ],
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature": 0.2
+            }
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+    except Exception as e:
+        logger.warning(f"Google Gemini/Gemma API call failed: {e}")
+        return None
+
+
 def _call_ollama(system_prompt: str, user_prompt: str, max_tokens: int = 200) -> str:
-    """Shared Ollama inference — llama3.1:8b with optimized token budget for local GPU/CPU."""
+    """Shared Ollama inference — Google Gemma 2 with Google Gemini API fallback."""
+    if os.getenv("GEMINI_API_KEY"):
+        gemini_res = _call_gemini_api(system_prompt, user_prompt, max_tokens)
+        if gemini_res:
+            return gemini_res
+
     model_name = OLLAMA_MODEL
     try:
         response = ollama.chat(

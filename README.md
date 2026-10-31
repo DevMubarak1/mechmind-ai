@@ -4,11 +4,12 @@
 > *Built for the MLH Hacktoberfest Hack Day 2026*
 
 [![MLH Hack Day 2026](https://img.shields.io/badge/MLH_Hacktoberfest-Hack_Day_2026-FF6B4A?style=for-the-badge&logo=majorleaguehacking)](https://mlh.io)
-[![Track: Best Use of Gemma](https://img.shields.io/badge/Track-Best_Use_of_Gemma-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/gemma)
+[![Track: Leverage Gemma](https://img.shields.io/badge/Track-Leverage_Gemma_Google_AI-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/gemma)
+[![Track: DigitalOcean Open-Source AI](https://img.shields.io/badge/Track-DigitalOcean_AI_Challenge-0080FF?style=for-the-badge&logo=digitalocean)](deploy/digitalocean)
 [![Track: Best Open-Source AI](https://img.shields.io/badge/Track-Best_Open--Source_AI-10B981?style=for-the-badge&logo=opensourceinitiative)](LICENSE)
 
 [![Status](https://img.shields.io/badge/Hardware_Status-Physical_Node_Operational-success.svg)](#prototype-device--hardware-architecture)
-[![AI Engine](https://img.shields.io/badge/AI_Engine-Google_Gemma_2_%2B_ChromaDB_RAG-blue.svg)](#how-google-gemma-powers-mechmind-diagnostics)
+[![AI Engine](https://img.shields.io/badge/AI_Engine-Google_Gemma_2_%2B_Gemini_API_%2B_ChromaDB-blue.svg)](#how-google-gemma-powers-mechmind-diagnostics)
 [![Dashboard](https://img.shields.io/badge/Live_Dashboard-mechmind--ng.vercel.app-blue.svg)](https://mechmind-ng.vercel.app)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32_%2B_ADXL345_%2B_DS18B20-orange.svg)](#edge-sensor-node-specifications)
 [![Field Interface](https://img.shields.io/badge/Field_Interface-WhatsApp_Copilot-25D366.svg)](#field-interfaces-zero-friction-delivery)
@@ -18,8 +19,9 @@
 
 ## 🏆 MLH Hack Day 2026 Focus Tracks
 
-1. **Best Use of Gemma**: MechMind AI leverages **Google Gemma 2 (`gemma2:2b` / `gemma2:9b`)** via local Ollama inference coupled with ChromaDB vector search and deterministic safety hard-pinning. Gemma 2 digests high-frequency vibration, thermal rate-of-rise (dT/dt), and acoustic pressure levels, grounding every diagnostic recommendation in official OEM service manuals (Caterpillar, Komatsu, Perkins, SANY).
-2. **Best Open-Source AI Project Overall**: MechMind bridges the physical-digital divide by marrying custom ESP32 IoT hardware with an end-to-end open-source AI software stack—100% open-weight model, open-source vector DB, open-source WhatsApp gateway, and MIT-licensed codebase.
+1. **Leverage Gemma Through Google Gemini APIs**: MechMind AI leverages **Google Gemma 2 (`gemma2:2b` / `gemma2:9b`)** locally via Ollama and in the cloud through Google Gemini API endpoints. Gemma 2 digests high-frequency vibration, thermal rate-of-rise (dT/dt), and acoustic pressure levels, grounding every diagnostic recommendation in official OEM service manuals (Caterpillar, Komatsu, Perkins, SANY).
+2. **Build Open-Source AI for Hacktoberfest (DigitalOcean Prize Challenge)**: MechMind features a turnkey, containerized cloud infrastructure specifically architected for the **DigitalOcean App Platform and Droplets** (`deploy/digitalocean/`). It integrates with DigitalOcean's open-source AI tools and 1-click Hermes deployment (`mlh.link/digitalocean-hermes-h26`), providing high-availability vector search and telemetry ingestion at predictable, low-cost pricing.
+3. **Best Open-Source AI Project Overall**: MechMind bridges the physical-digital divide by marrying custom ESP32 IoT hardware with an end-to-end open-source AI software stack—100% open-weight model, open-source vector DB, open-source WhatsApp gateway, and MIT-licensed codebase.
 
 ---
 
@@ -240,21 +242,39 @@ mechmind-ai/
 │   ├── index.js                    # Baileys WhatsApp client & message dispatcher
 │   └── package.json                # Node.js dependencies
 │
+├── deploy/                         # Cloud Deployment & Infrastructure
+│   └── digitalocean/               # DigitalOcean Open-Source AI Deployment Stack
+│       ├── digitalocean-app.yaml   # App Platform Spec (FastAPI + ChromaDB + WhatsApp)
+│       ├── docker-compose.digitalocean.yml # Production multi-container Docker compose
+│       └── setup_droplet.sh        # Automated 1-click Droplet provisioning script
+│
 ├── docs/                           # Official Technical Dossiers & Presentation Guides
 │   ├── images/                     # Comprehensive hardware photos & interface screenshots
+│   ├── MechMind_AI_Judges_QA_Defense_Guide.pdf # Master Technical Q&A Defense Dossier
 │   ├── MechMind_AI_MLH_Hack_Day_Presenter_Guide.pdf # Official Pitch & Defense Playbook
 │   ├── MechMind_AI_Project_Synopsis_AGRA_SMEDAN.pdf # AGRA-SMEDAN Agri-Tech Dossier
 │   ├── MechMind_AI_Project_Synopsis_NAP2026.pdf     # National Automation Prize Dossier
 │   └── SYSTEM_ARCHITECTURE.md      # Exhaustive engineering specification
 │
-├── docker-compose.yml              # PostgreSQL 16 & ChromaDB container orchestration
+├── docker-compose.yml              # Local PostgreSQL 16 & ChromaDB orchestration
 ├── LICENSE                         # Open-source MIT License
 └── README.md                       # Master project overview & MLH Hack Day guide
 ```
 
 ---
 
-## Quickstart: Running with Google Gemma
+## 🌊 DigitalOcean Open-Source AI Deployment
+
+MechMind AI features a production-ready, containerized cloud stack specifically tailored for the **DigitalOcean Open-Source AI Prize Challenge**:
+
+* **DigitalOcean App Platform Spec** ([`deploy/digitalocean/digitalocean-app.yaml`](deploy/digitalocean/digitalocean-app.yaml)): Provides seamless, git-triggered continuous deployment for the FastAPI telemetry engine, ChromaDB vector store, and WhatsApp gateway directly from our public GitHub repository.
+* **1-Click Droplet Provisioning** ([`deploy/digitalocean/setup_droplet.sh`](deploy/digitalocean/setup_droplet.sh)): Automated bash script that updates a DigitalOcean Ubuntu Droplet, provisions Docker, pulls `gemma2:2b`, and spins up the multi-container stack in under 2 minutes.
+* **Hermes & Open-Source AI Hosting**: Compatible with DigitalOcean's 1-click Hermes deployment ([`mlh.link/digitalocean-hermes-h26`](https://mlh.link/digitalocean-hermes-h26)) and GPU Droplets for running high-throughput open-weight inference.
+* **Predictable Fleet Economics**: By running on DigitalOcean, MechMind keeps fleet monitoring infrastructure costs under **$2/month per machine**, avoiding punitive cloud egress fees.
+
+---
+
+## Quickstart: Running with Google Gemma & Gemini APIs
 
 ### 1. Prerequisites
 - Python 3.10 or 3.11
