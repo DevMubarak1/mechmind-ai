@@ -37,3 +37,4 @@ echo " MechMind AI Successfully Deployed on DigitalOcean!"
 echo " Telemetry Dashboard: http://$(curl -s ifconfig.me):8080"
 echo " WhatsApp Gateway:    http://$(curl -s ifconfig.me):3001"
 echo "=============================================================================="
+

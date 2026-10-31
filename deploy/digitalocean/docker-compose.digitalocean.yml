@@ -79,3 +79,4 @@ volumes:
 networks:
   mechmind_net:
     driver: bridge
+
