@@ -17,7 +17,8 @@ import ollama
 logger = logging.getLogger("mechmind.rag")
 
 CHROMA_URL = os.getenv("CHROMA_URL", "http://localhost:8100")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma2:2b")
+# Google Gemma 4 E2B edge model default, fallback to gemma4 or gemma2:2b
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
 KNOWLEDGE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "knowledge"))
 COLLECTION_NAME = "mechmind_machinery_knowledge"
 
@@ -562,7 +563,7 @@ def _call_gemini_api(system_prompt: str, user_prompt: str, max_tokens: int = 300
 
 
 def _call_ollama(system_prompt: str, user_prompt: str, max_tokens: int = 200) -> str:
-    """Shared Ollama inference — Google Gemma 2 with Google Gemini API fallback."""
+    """Shared Ollama inference — Google Gemma 4 (E2B) with Google Gemini API fallback."""
     if os.getenv("GEMINI_API_KEY"):
         gemini_res = _call_gemini_api(system_prompt, user_prompt, max_tokens)
         if gemini_res:

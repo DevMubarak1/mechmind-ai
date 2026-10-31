@@ -4,12 +4,12 @@
 > *Built for the MLH Hacktoberfest Hack Day 2026*
 
 [![MLH Hack Day 2026](https://img.shields.io/badge/MLH_Hacktoberfest-Hack_Day_2026-FF6B4A?style=for-the-badge&logo=majorleaguehacking)](https://mlh.io)
-[![Track: Leverage Gemma](https://img.shields.io/badge/Track-Leverage_Gemma_Google_AI-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/gemma)
+[![Track: Leverage Gemma 4](https://img.shields.io/badge/Track-Leverage_Gemma_4_Google_AI-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/gemma)
 [![Track: DigitalOcean Open-Source AI](https://img.shields.io/badge/Track-DigitalOcean_AI_Challenge-0080FF?style=for-the-badge&logo=digitalocean)](deploy/digitalocean)
 [![Track: Best Open-Source AI](https://img.shields.io/badge/Track-Best_Open--Source_AI-10B981?style=for-the-badge&logo=opensourceinitiative)](LICENSE)
 
 [![Status](https://img.shields.io/badge/Hardware_Status-Physical_Node_Operational-success.svg)](#prototype-device--hardware-architecture)
-[![AI Engine](https://img.shields.io/badge/AI_Engine-Google_Gemma_2_%2B_Gemini_API_%2B_ChromaDB-blue.svg)](#how-google-gemma-powers-mechmind-diagnostics)
+[![AI Engine](https://img.shields.io/badge/AI_Engine-Google_Gemma_4_%2B_Gemini_API_%2B_ChromaDB-blue.svg)](#how-google-gemma-powers-mechmind-diagnostics)
 [![Dashboard](https://img.shields.io/badge/Live_Dashboard-mechmind--ng.vercel.app-blue.svg)](https://mechmind-ng.vercel.app)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32_%2B_ADXL345_%2B_DS18B20-orange.svg)](#edge-sensor-node-specifications)
 [![Field Interface](https://img.shields.io/badge/Field_Interface-WhatsApp_Copilot-25D366.svg)](#field-interfaces-zero-friction-delivery)
@@ -19,7 +19,7 @@
 
 ## 🏆 MLH Hack Day 2026 Focus Tracks
 
-1. **Leverage Gemma Through Google Gemini APIs**: MechMind AI leverages **Google Gemma 2 (`gemma2:2b` / `gemma2:9b`)** locally via Ollama and in the cloud through Google Gemini API endpoints. Gemma 2 digests high-frequency vibration, thermal rate-of-rise (dT/dt), and acoustic pressure levels, grounding every diagnostic recommendation in official OEM service manuals (Caterpillar, Komatsu, Perkins, SANY).
+1. **Leverage Gemma 4 Through Google Gemini APIs**: MechMind AI leverages **Google Gemma 4 (`gemma4:e2b` edge / `gemma4`)** locally via Ollama and in the cloud through Google Gemini API endpoints. Google DeepMind's Gemma 4 family features dense edge models (such as E2B at ~2.3B parameters with 128K context) specifically designed for low-latency IoT, mobile, and edge telemetry deployments. Gemma 4 digests high-frequency vibration, thermal rate-of-rise (dT/dt), and acoustic pressure levels, grounding every diagnostic recommendation in official OEM service manuals (Caterpillar, Komatsu, Perkins, SANY).
 2. **Build Open-Source AI for Hacktoberfest (DigitalOcean Prize Challenge)**: MechMind features a turnkey, containerized cloud infrastructure specifically architected for the **DigitalOcean App Platform and Droplets** (`deploy/digitalocean/`). It integrates with DigitalOcean's open-source AI tools and 1-click Hermes deployment (`mlh.link/digitalocean-hermes-h26`), providing high-availability vector search and telemetry ingestion at predictable, low-cost pricing.
 3. **Best Open-Source AI Project Overall**: MechMind bridges the physical-digital divide by marrying custom ESP32 IoT hardware with an end-to-end open-source AI software stack—100% open-weight model, open-source vector DB, open-source WhatsApp gateway, and MIT-licensed codebase.
 
@@ -96,8 +96,8 @@ When mechanical distress occurs, MechMind translates raw sensor telemetry into e
             +-------------------+-------------------+
                                 v
    +-------------------------------------------------------+
-   |          Google Gemma 2 RAG Cognitive Engine          |
-   |   • Model: Google Gemma 2 (gemma2:2b / gemma2:9b)     |
+   |          Google Gemma 4 RAG Cognitive Engine          |
+   |   • Model: Google Gemma 4 (gemma4:e2b / Gemini API)   |
    |   • Semantic Context Synthesis via ChromaDB Embeddings|
    |   • Deterministic Safety Pinning (SPN 100 Emergency)  |
    |   • Structured Cause-Probability & Inspection Sequence|
@@ -121,14 +121,15 @@ When mechanical distress occurs, MechMind translates raw sensor telemetry into e
 
 ---
 
-## How Google Gemma Powers MechMind Diagnostics
+## How Google Gemma 4 Powers MechMind Diagnostics
 
-MechMind utilizes **Google Gemma 2** as its primary diagnostic brain:
+MechMind utilizes **Google Gemma 4** as its primary diagnostic brain:
 
-* **High Parameter Efficiency**: Using `gemma2:2b` allows the entire diagnostic system to run locally on standard developer laptops and edge workstations without requiring expensive cloud GPUs or internet connectivity. For high-throughput servers, `gemma2:9b` delivers near-human expert reasoning.
-* **Telemetry Grounding via RAG**: Instead of relying on general LLM memory, Gemma 2 is provided with indexed service documentation (Caterpillar, Komatsu, Perkins, Cummins) retrieved from ChromaDB based on real-time sensor anomalies.
+* **Edge Telemetry Efficiency (Gemma 4 E2B)**: Using the dense edge model `gemma4:e2b` (~2.3B effective parameters, 128K context window) allows sub-second, zero-cost diagnostic synthesis right on edge field gateways and technician laptops without needing internet connectivity or GPU clusters.
+* **Google Gemini API Cloud Hybrid Fallback**: For high-throughput fleet-wide analysis across multi-machine operations, the backend routes to Google Gemini API / Google AI Studio endpoints (`_call_gemini_api()` in `rag_engine.py`) to process complex multimodal engineering schematics.
+* **Telemetry Grounding via RAG**: Instead of relying on general LLM memory, Gemma 4 is provided with indexed service documentation (Caterpillar, Komatsu, Perkins, SANY) retrieved from ChromaDB based on real-time sensor anomalies.
 * **Deterministic Safety Code Pinning**: To prevent AI hallucinations on dangerous equipment faults (e.g. loss of oil pressure or hydraulic failure), our pipeline deterministically hard-pins emergency shutdown protocols to **Rank 1** of Gemma’s retrieved context whenever critical SAE J1939 fault codes appear (such as SPN 100 FMI 1).
-* **Multi-Modal Technician Input**: Field mechanics can send WhatsApp voice notes (transcribed via `faster-whisper`), text queries, or component photos; Gemma 2 generates step-by-step physical inspection checklists, torque specifications, and safety precautions.
+* **Multi-Modal Technician Input**: Field mechanics can send WhatsApp voice notes (transcribed via `faster-whisper`), text queries, or component photos; Gemma 4 generates step-by-step physical inspection checklists, torque specifications, and safety precautions.
 
 ---
 
@@ -184,11 +185,11 @@ The centralized management console provides operators and maintenance directors 
 | Real-Time Kinematic Waveform Monitor | Automated Alert Thresholds & Diagnostics Feed |
 | :---: | :---: |
 | <img src="docs/images/dashboard_live_telemetry.png" width="430px" alt="Live Telemetry Dashboard Waveforms" /> | <img src="docs/images/dashboard_alerts_log.png" width="430px" alt="Dashboard Active Alerts Log" /> |
-| *Tri-axial vibration (X, Y, Z), temperature rate-of-rise (dT/dt), and acoustic pressure updated every 2 seconds.* | *Automatic threshold violation logs paired with instant, OEM-grounded Google Gemma 2 recommendations.* |
+| *Tri-axial vibration (X, Y, Z), temperature rate-of-rise (dT/dt), and acoustic pressure updated every 2 seconds.* | *Automatic threshold violation logs paired with instant, OEM-grounded Google Gemma 4 recommendations.* |
 
 ### 2. WhatsApp Mobile Diagnostic Copilot
 
-Because WhatsApp is universally used by mechanics and fleet operators across Africa, MechMind offers a zero-friction mobile interface powered by **Baileys WebSockets + Google Gemma 2**.
+Because WhatsApp is universally used by mechanics and fleet operators across Africa, MechMind offers a zero-friction mobile interface powered by **Baileys WebSockets + Google Gemma 4**.
 
 * **Live Dedicated Gateway**: `+234 701 029 9562`
 * **Zero-Friction Access**: No mobile apps to download, zero software training required.
@@ -196,7 +197,7 @@ Because WhatsApp is universally used by mechanics and fleet operators across Afr
 | 1. WhatsApp Pairing via Dashboard | 2. Real-Time Telemetry Queries | 3. Step-by-Step OEM Repair Guidance | 4. Multimodal Visual Inspection |
 | :---: | :---: | :---: | :---: |
 | <img src="docs/images/whatsapp_device_pairing.png" width="210px" alt="WhatsApp Device Pairing" /> | <img src="docs/images/whatsapp_telemetry_query.jpg" width="210px" alt="WhatsApp Telemetry Query" /> | <img src="docs/images/whatsapp_repair_guidance.jpg" width="210px" alt="WhatsApp Repair Guidance" /> | <img src="docs/images/whatsapp_image_diagnosis.jpg" width="210px" alt="WhatsApp Image Diagnosis" /> |
-| *Single-click QR authentication directly within the fleet dashboard.* | *Mechanics text natural questions to inspect live operating temperature and vibration.* | *Gemma 2 outputs exact tools, wrench sizes, and sequential repair checklists.* | *Technicians snap photos of worn parts for instant diagnostic identification.* |
+| *Single-click QR authentication directly within the fleet dashboard.* | *Mechanics text natural questions to inspect live operating temperature and vibration.* | *Gemma 4 outputs exact tools, wrench sizes, and sequential repair checklists.* | *Technicians snap photos of worn parts for instant diagnostic identification.* |
 
 ---
 
@@ -268,24 +269,25 @@ mechmind-ai/
 MechMind AI features a production-ready, containerized cloud stack specifically tailored for the **DigitalOcean Open-Source AI Prize Challenge**:
 
 * **DigitalOcean App Platform Spec** ([`deploy/digitalocean/digitalocean-app.yaml`](deploy/digitalocean/digitalocean-app.yaml)): Provides seamless, git-triggered continuous deployment for the FastAPI telemetry engine, ChromaDB vector store, and WhatsApp gateway directly from our public GitHub repository.
-* **1-Click Droplet Provisioning** ([`deploy/digitalocean/setup_droplet.sh`](deploy/digitalocean/setup_droplet.sh)): Automated bash script that updates a DigitalOcean Ubuntu Droplet, provisions Docker, pulls `gemma2:2b`, and spins up the multi-container stack in under 2 minutes.
+* **1-Click Droplet Provisioning** ([`deploy/digitalocean/setup_droplet.sh`](deploy/digitalocean/setup_droplet.sh)): Automated bash script that updates a DigitalOcean Ubuntu Droplet, provisions Docker, pulls `gemma4:e2b` (or `gemma4`), and spins up the multi-container stack in under 2 minutes.
 * **Hermes & Open-Source AI Hosting**: Compatible with DigitalOcean's 1-click Hermes deployment ([`mlh.link/digitalocean-hermes-h26`](https://mlh.link/digitalocean-hermes-h26)) and GPU Droplets for running high-throughput open-weight inference.
 * **Predictable Fleet Economics**: By running on DigitalOcean, MechMind keeps fleet monitoring infrastructure costs under **$2/month per machine**, avoiding punitive cloud egress fees.
 
 ---
 
-## Quickstart: Running with Google Gemma & Gemini APIs
+## Quickstart: Running with Google Gemma 4 & Gemini APIs
 
 ### 1. Prerequisites
 - Python 3.10 or 3.11
 - [Ollama](https://ollama.com/) installed on your machine
 - Node.js 18+ (optional, for WhatsApp bot)
 
-### 2. Pull Google Gemma 2
+### 2. Pull Google Gemma 4
 ```bash
-ollama pull gemma2:2b
-# Or for higher reasoning capacity on GPU:
-# ollama pull gemma2:9b
+ollama pull gemma4:e2b
+# Or larger desktop/server models:
+# ollama pull gemma4
+# Fallback support for gemma2:2b is also supported
 ```
 
 ### 3. Launch Backend & Dashboard
@@ -318,7 +320,7 @@ Scan the terminal QR code or use the Web Dashboard WhatsApp modal to link the di
 * **Oni Mujeeb Ramadan** — Product Operations & Field Lead (Lagos State University, Civil Engineering)  
   *Directs field test validation, technician workflow integration, and agricultural mechanization outreach.*
 * **Mubarak Raji Babatunde** — AI & Software Lead (Lagos State University, Civil Engineering)  
-  *Directs Google Gemma 2 RAG architecture, FastAPI backend, SSE stream, and WhatsApp gateway.*
+  *Directs Google Gemma 4 RAG architecture, Google Gemini API cloud integration, FastAPI backend, SSE stream, and WhatsApp gateway.*
 * **Olawale Oladele** — Hardware & Embedded Systems Lead (Lagos State University, Mechanical Engineering)  
   *Directs ESP32 firmware, ADXL345/INMP441 sensor integration, PCB design, and 3D CAD enclosure.*
 

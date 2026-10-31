@@ -43,7 +43,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mechmind_user}:${POSTGRES_PASSWORD:-mechmind_secure_pass_2026}@db:5432/${POSTGRES_DB:-mechmind}
       - CHROMA_URL=http://chroma:8000
-      - OLLAMA_MODEL=gemma2:2b
+      - OLLAMA_MODEL=gemma4:e2b
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - WHATSAPP_BOT_URL=http://whatsapp-bot:3001
     depends_on:

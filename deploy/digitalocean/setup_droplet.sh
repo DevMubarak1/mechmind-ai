@@ -21,10 +21,10 @@ if ! command -v ollama &> /dev/null; then
     curl -fsSL https://ollama.com/install.sh | sh
 fi
 
-echo "=== [4/5] Pulling Google Gemma 2 (gemma2:2b) ==="
+echo "=== [4/5] Pulling Google Gemma Model (gemma4:e2b / gemma4) ==="
 ollama serve > /dev/null 2>&1 &
 sleep 3
-ollama pull gemma2:2b
+ollama pull gemma4:e2b || ollama pull gemma4 || ollama pull gemma2:2b
 
 echo "=== [5/5] Launching MechMind AI Containerized Stack ==="
 git clone https://github.com/DevMubarak1/mechmind-ai.git /opt/mechmind-ai || true

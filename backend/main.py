@@ -57,8 +57,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://mechmind:mechmind2026@loc
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
-# Ollama config
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma2:2b")
+# Ollama config — Google Gemma 4 (E2B edge model default, fallback to gemma4 or gemma2:2b)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
 WHATSAPP_BOT_URL = os.getenv("WHATSAPP_BOT_URL", "http://localhost:3001")
 
 # ========================
