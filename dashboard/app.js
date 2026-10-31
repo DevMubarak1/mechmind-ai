@@ -1,6 +1,6 @@
 /**
  * MechMind AI v1 — Telemetry & Diagnostics Frontend Logic (app.js)
- * Minimalist Monochrome Aesthetics, High-precision Chart.js, Ollama Copilot
+ * Minimalist Monochrome Aesthetics, High-precision Chart.js, Google Gemma 2 Copilot
  */
 
 const API_BASE = window.location.origin.includes('5500') || window.location.origin.includes('3000') 
@@ -475,7 +475,7 @@ function setupEventListeners() {
         <div class="wa-bubble wa-bubble-ai">
           <div class="wa-sender-tag">
             <span class="wa-sender-name">MECHMIND ENGINE</span>
-            <span class="wa-model-badge">LLAMA 3.1:8B</span>
+            <span class="wa-model-badge">GOOGLE GEMMA 2:2B</span>
           </div>
           <div class="wa-message-text">
             Diagnostic session refreshed.<br><br>
@@ -674,7 +674,7 @@ function showTypingIndicator() {
   div.innerHTML = `
     <div class="wa-sender-tag">
       <span class="wa-sender-name">MECHMIND ENGINE</span>
-      <span class="wa-model-badge">LLAMA 3.1:8B</span>
+      <span class="wa-model-badge">GOOGLE GEMMA 2:2B</span>
     </div>
     <div class="wa-typing-indicator">
       <span class="wa-typing-dot"></span>
@@ -714,7 +714,7 @@ function appendWhatsAppMessage(sender, text, isUser = false, imageUrl = null) {
     div.innerHTML = `
       <div class="wa-sender-tag">
         <span class="wa-sender-name">MECHMIND ENGINE</span>
-        <span class="wa-model-badge">LLAMA 3.1:8B</span>
+        <span class="wa-model-badge">GOOGLE GEMMA 2:2B</span>
       </div>
       <div class="wa-message-text">${formatMarkdown(text)}</div>
       <div class="wa-msg-meta">
