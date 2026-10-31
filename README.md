@@ -13,6 +13,7 @@
 [![Dashboard](https://img.shields.io/badge/Live_Dashboard-mechmind--ng.vercel.app-blue.svg)](https://mechmind-ng.vercel.app)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32_%2B_ADXL345_%2B_DS18B20-orange.svg)](#edge-sensor-node-specifications)
 [![Field Interface](https://img.shields.io/badge/Field_Interface-WhatsApp_Copilot-25D366.svg)](#field-interfaces-zero-friction-delivery)
+[![Pitch Deck](https://img.shields.io/badge/Pitch_Deck-PowerPoint_%2B_PDF-D24726.svg?logo=microsoftpowerpoint)](docs/MechMind_AI_Pitch_Deck.pdf)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -34,12 +35,41 @@
 
 ---
 
+## 📊 Official Pitch Deck & Presentation Slides
+
+> 📥 **Direct Presentation Downloads**:
+> * 🖥️ **[Download PowerPoint Deck (.pptx)](docs/MechMind_AI_Pitch_Deck.pptx)** — *Full editable presentation with high-res assets & presenter notes*
+> * 📄 **[Open Presentation PDF](docs/MechMind_AI_Pitch_Deck.pdf)** — *Interactive 9-slide deck viewable directly in GitHub / any browser*
+> * 📋 **[Master Presenter Defense Guide (PDF)](docs/MechMind_AI_MLH_Hack_Day_Presenter_Guide.pdf)** — *Step-by-step 3-minute pitch playbook for judges*
+
+<div align="center">
+  <a href="docs/MechMind_AI_Pitch_Deck.pdf">
+    <img src="docs/images/pitch_deck_slide_1.png" alt="MechMind AI Official Pitch Deck Cover Slide" width="850px" style="border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.25);" />
+  </a>
+  <p><em>Click the title slide above to view the complete 9-slide deck in PDF format. Built specifically for the MLH Hacktoberfest Hack Day 2026.</em></p>
+</div>
+
+### Key Pitch Deck Slides at a Glance
+
+| Slide 02: The Breakdown Trap | Slide 03: How MechMind Works | Slide 04: The Edge Sensor Node |
+| :---: | :---: | :---: |
+| <img src="docs/images/pitch_deck_slide_2.png" width="280px" alt="Slide 2: The Problem" /> | <img src="docs/images/pitch_deck_slide_3.png" width="280px" alt="Slide 3: How MechMind Works" /> | <img src="docs/images/pitch_deck_slide_4.png" width="280px" alt="Slide 4: Sensor Node" /> |
+| *One breakdown strands heavy machinery for weeks.* | *Google Gemma 4 acts as the cognitive diagnostic brain.* | *Non-invasive magnetic clamping with 30-second install.* |
+
+| Slide 06: Grounded OEM Manual RAG | Slide 07: Gemini API + DigitalOcean Stack | Slide 08: WhatsApp Field Copilot |
+| :---: | :---: | :---: |
+| <img src="docs/images/pitch_deck_slide_6.png" width="280px" alt="Slide 6: Grounded RAG" /> | <img src="docs/images/pitch_deck_slide_7.png" width="280px" alt="Slide 7: Gemini API & DigitalOcean" /> | <img src="docs/images/pitch_deck_slide_8.png" width="280px" alt="Slide 8: WhatsApp Delivery" /> |
+| *Strict manual retrieval guarantees 0.0% safety hallucinations.* | *Edge-to-cloud synergy between Gemma 4, Gemini API, and Droplets.* | *Instant step-by-step repair guidance in the mechanic's pocket.* |
+
+---
+
 ## 📑 Table of Contents
 
+- [Official Pitch Deck & Presentation Slides](#-official-pitch-deck--presentation-slides)
 - [Executive Overview](#executive-overview)
 - [The Problem: The Diagnostic Divide in Emerging Fleets](#the-problem-the-diagnostic-divide-in-emerging-fleets)
 - [System Architecture](#system-architecture)
-- [How Google Gemma Powers MechMind Diagnostics](#how-google-gemma-powers-mechmind-diagnostics)
+- [How Google Gemma 4 Powers MechMind Diagnostics](#how-google-gemma-powers-mechmind-diagnostics)
 - [Prototype Device & Hardware Architecture](#prototype-device--hardware-architecture)
   - [Hardware Gallery & Physical Node Views](#hardware-gallery--physical-node-views)
   - [CAD & Electrical Schematics](#cad--electrical-schematics)
@@ -50,7 +80,7 @@
   - [2. WhatsApp Mobile Diagnostic Copilot](#2-whatsapp-mobile-diagnostic-copilot)
 - [56-Case Blind Diagnostic Benchmark](#56-case-blind-diagnostic-benchmark)
 - [Repository Structure](#repository-structure)
-- [Quickstart: Running with Google Gemma](#quickstart-running-with-google-gemma)
+- [Quickstart: Running with Google Gemma 4](#quickstart-running-with-google-gemma--gemini-apis)
 - [Engineering Team](#engineering-team)
 - [License](#license)
 
@@ -60,7 +90,7 @@
 
 **MechMind AI** is an indigenous condition-monitoring and diagnostic intelligence ecosystem developed to eliminate catastrophic mechanical breakdowns in heavy industrial, construction, and agricultural equipment. 
 
-By coupling an untethered, non-invasive magnetic edge sensor node with **Google Gemma 2** through a Retrieval-Augmented Generation (RAG) pipeline, MechMind captures real-time vibration harmonics, thermal anomalies, and acoustic distress signatures from operating machinery.
+By coupling an untethered, non-invasive magnetic edge sensor node with **Google Gemma 4 (E2B Edge & Gemini Cloud APIs)** through a Retrieval-Augmented Generation (RAG) pipeline, MechMind captures real-time vibration harmonics, thermal anomalies, and acoustic distress signatures from operating machinery.
 
 When mechanical distress occurs, MechMind translates raw sensor telemetry into evidence-grounded repair protocols delivered directly to technicians over **WhatsApp** (+234 701 029 9562) and an interactive **Live Fleet Web Dashboard**.
 
@@ -251,6 +281,8 @@ mechmind-ai/
 │
 ├── docs/                           # Official Technical Dossiers & Presentation Guides
 │   ├── images/                     # Comprehensive hardware photos & interface screenshots
+│   ├── MechMind_AI_Pitch_Deck.pptx # Official 9-Slide Presentation Deck (PowerPoint)
+│   ├── MechMind_AI_Pitch_Deck.pdf  # Official 9-Slide Presentation Deck (Interactive PDF)
 │   ├── MechMind_AI_Judges_QA_Defense_Guide.pdf # Master Technical Q&A Defense Dossier
 │   ├── MechMind_AI_MLH_Hack_Day_Presenter_Guide.pdf # Official Pitch & Defense Playbook
 │   ├── MechMind_AI_Project_Synopsis_AGRA_SMEDAN.pdf # AGRA-SMEDAN Agri-Tech Dossier
