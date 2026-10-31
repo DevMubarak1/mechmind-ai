@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MechMind AI v1 — Heavy Machinery Telemetry & Edge Diagnostics</title>
+  <meta name="description" content="Industrial IoT Telemetry, ADXL345 Vibration, DS18B20 Temperature & Local Ollama Edge Diagnostics for Heavy Construction Equipment.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-active-tab="copilot">
+
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="brand-group">
+      <div class="brand-symbol">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-line">
+          <span class="brand-title">MECHMIND</span>
+          <span class="brand-tag">v1 EDGE</span>
+        </div>
+        <p class="brand-subtitle">HEAVY EQUIPMENT TELEMETRY & AI COPILOT</p>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="selector-container">
+        <label for="equipmentSelect">ASSET:</label>
+        <div class="select-wrapper">
+          <select id="equipmentSelect" class="mono-select" style="display:none;">
+              <option value="1" data-node="NODE-001" selected>CAT 320</option>
+          </select>
+          <span class="mono-select" style="display:inline-block;pointer-events:none;">CAT 320 — Hydraulic Excavator [LIVE — NODE-001]</span>
+        </div>
+      </div>
+
+      <div class="status-group">
+        <div class="status-item" id="backendStatusPill">
+          <span class="status-dot dot-active"></span>
+          <span class="status-label">API</span>
+          <span class="status-value" id="backendStatusText">ONLINE</span>
+        </div>
+        <div class="status-item" id="ollamaStatusPill">
+          <span class="status-dot dot-active"></span>
+          <span class="status-label">AI ENGINE</span>
+          <span class="status-value">GEMMA 4 (E2B)</span>
+        </div>
+        <div class="status-item" id="whatsappPill" title="WhatsApp Bot Status">
+          <span class="status-dot dot-active"></span>
+          <span class="status-label">WA BOT</span>
+          <span class="status-value">+234 7010299562</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="dashboard-shell">
+
+    <!-- Primary Metric Instruments (Tab: Telemetry) -->
+    <section class="instruments-grid tab-section" data-tab-content="telemetry">
+      <!-- Instrument 01: Temperature -->
+      <div class="instrument-card" id="cardTemp">
+        <div class="card-meta">
+          <span class="card-index">01 / THERMAL</span>
+          <span class="stat-badge normal" id="tempBadge">NORMAL</span>
+        </div>
+        <div class="card-headline">HYDRAULIC RESERVOIR</div>
+        <div class="metric-display">
+          <span class="metric-number" id="tempVal">32.4</span>
+          <span class="metric-unit">°C</span>
+        </div>
+        <div class="meter-track">
+          <div class="meter-fill" id="tempBar" style="width: 27%;"></div>
+        </div>
+        <div class="card-foot">
+          <span>WARN 85°C</span>
+          <span>CRIT 105°C</span>
+        </div>
+      </div>
+
+      <!-- Instrument 02: Vibration -->
+      <div class="instrument-card" id="cardVib">
+        <div class="card-meta">
+          <span class="card-index">02 / KINEMATIC</span>
+          <span class="stat-badge normal" id="vibBadge">OPTIMAL</span>
+        </div>
+        <div class="card-headline">3-AXIS VIBRATION RMS</div>
+        <div class="metric-display">
+          <span class="metric-number" id="vibVal">1.18</span>
+          <span class="metric-unit">g</span>
+        </div>
+        <div class="meter-track">
+          <div class="meter-fill" id="vibBar" style="width: 26%;"></div>
+        </div>
+        <div class="card-foot">
+          <span id="axisReadout">X: 0.0 · Y: -0.1 · Z: -1.2</span>
+          <span>THRESHOLD 4.5g</span>
+        </div>
+      </div>
+
+      <!-- Instrument 03: Acoustics -->
+      <div class="instrument-card" id="cardSound">
+        <div class="card-meta">
+          <span class="card-index">03 / ACOUSTIC</span>
+          <span class="stat-badge normal" id="soundBadge">NORMAL</span>
+        </div>
+        <div class="card-headline">SOUND PRESSURE LEVEL</div>
+        <div class="metric-display">
+          <span class="metric-number" id="soundVal">41.5</span>
+          <span class="metric-unit">dB</span>
+        </div>
+        <div class="meter-track">
+          <div class="meter-fill" id="soundBar" style="width: 32%;"></div>
+        </div>
+        <div class="card-foot">
+          <span>SENSOR: INMP441 MEMS</span>
+          <span>PEAK 54.0 dB</span>
+        </div>
+      </div>
+
+      <!-- Instrument 04: Feed Control -->
+      <div class="instrument-card control-card" id="cardHealth">
+        <div class="card-meta">
+          <span class="card-index">04 / INGESTION</span>
+          <span class="stat-badge live" id="streamBadge">LIVE SENSOR</span>
+        </div>
+        <div class="card-headline">STREAM CONTROL</div>
+        <div class="control-actions">
+          <button class="btn-ctrl" id="btnRefresh">
+            <span>SYNC REAL SENSOR</span>
+          </button>
+        </div>
+        <div class="card-foot">
+          <span id="nodeIdLabel">NODE: NODE-001</span>
+          <span id="lastUpdated">Updated just now</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Visuals & Analytics Section (Waveforms on left, Diagnostics + Alerts on right) -->
+    <section class="analytics-layout">
+      <!-- Left Column: Waveforms & Trends (Tab: Waveforms) -->
+      <div class="waveform-column tab-section" data-tab-content="waveforms">
+
+        <!-- Panel 1: Live Vibration Waveform -->
+        <div class="panel-box">
+          <div class="panel-topbar">
+            <div class="panel-header-title">
+              <span class="panel-mark">■</span>
+              <h3>VIBRATION WAVEFORM ANALYSIS</h3>
+              <span class="panel-sub">ADXL345 3-AXIS SENSOR</span>
+            </div>
+            <div class="spectrum-legend">
+              <span class="legend-chip chip-x">X-AXIS</span>
+              <span class="legend-chip chip-y">Y-AXIS</span>
+              <span class="legend-chip chip-z">Z-AXIS</span>
+              <span class="legend-chip chip-mag">MAG</span>
+            </div>
+          </div>
+          <div class="canvas-wrapper">
+            <canvas id="vibrationChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Panel 2: Temperature & Acoustics -->
+        <div class="panel-box">
+          <div class="panel-topbar">
+            <div class="panel-header-title">
+              <span class="panel-mark">■</span>
+              <h3>THERMAL PROFILE & ACOUSTIC LOG</h3>
+              <span class="panel-sub">DS18B20 ROLLING WINDOW</span>
+            </div>
+            <div class="panel-pill-mono">DS18B20 + INMP441</div>
+          </div>
+          <div class="canvas-wrapper">
+            <canvas id="tempChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Diagnostics & Incident Log -->
+      <div class="diagnostics-column">
+
+        <!-- Diagnostics Console (Tab: Copilot - The WhatsApp AI Experience!) -->
+        <div class="panel-box console-panel tab-section" data-tab-content="copilot" id="copilotPanel">
+          <div class="panel-topbar wa-copilot-header">
+            <div class="wa-header-left">
+              <div class="wa-avatar-symbol">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                </svg>
+              </div>
+              <div class="wa-header-info">
+                <div class="wa-copilot-title">
+                  <span>MECHMIND AI COPILOT</span>
+                  <span class="wa-online-indicator"></span>
+                </div>
+                <span class="wa-copilot-sub" id="copilotSubText">CAT 320 [NODE-001] · Multi-turn Memory Active</span>
+              </div>
+            </div>
+            <div class="wa-header-actions">
+              <button class="btn-chat-reset" id="btnResetChat" title="Clear conversation history">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <polyline points="1 4 1 10 7 10"></polyline>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                <span>RESET</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- WhatsApp Chat Thread Container -->
+          <div class="console-body wa-chat-thread" id="chatContainer">
+            <!-- System Telemetry Date Banner -->
+            <div class="wa-system-pill">
+              <span>TODAY · FIELD TELEMETRY ACTIVE FOR CAT 320</span>
+            </div>
+
+            <!-- Welcome AI Message -->
+            <div class="wa-bubble wa-bubble-ai">
+              <div class="wa-sender-tag">
+                <span class="wa-sender-name">MECHMIND ENGINE</span>
+                <span class="wa-model-badge">GOOGLE GEMMA 4:E2B</span>
+              </div>
+              <div class="wa-message-text">
+                <strong>MechMind Diagnostics Online</strong><br>
+                Real-time telemetry stream is active from your ESP32 node.<br><br>
+                • <strong>Temp:</strong> <span id="chatLiveTemp">32.4°C</span> (DS18B20 digital probe)<br>
+                • <strong>Vibration:</strong> <span id="chatLiveVib">1.18g</span> (ADXL345 3-axis)<br><br>
+                Ask about live dashboard statistics, fleet status, trouble codes (e.g. <em>SPN 100</em>), or attach a component photo for visual triage.
+              </div>
+              <div class="wa-msg-meta">
+                <span class="wa-time" id="chatInitTime">15:00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Action Diagnostic Chips -->
+          <div class="prompt-shortcuts">
+            <button class="shortcut-chip quick-chip" data-prompt="What are the current dashboard stats, fleet metrics, and live sensor readings?">
+              DASHBOARD STATS
+            </button>
+            <button class="shortcut-chip quick-chip" data-prompt="Analyze current vibration and temperature for abnormal bearing wear.">
+              BEARING WEAR
+            </button>
+            <button class="shortcut-chip quick-chip" data-prompt="What are the recommended actions if hydraulic temperature exceeds 85°C on CAT 320?">
+              OVERHEAT PROTOCOL
+            </button>
+            <button class="shortcut-chip quick-chip" data-prompt="Diagnose potential causes for hydraulic pump cavitation.">
+              HYDRAULIC CAVITATION
+            </button>
+            <button class="shortcut-chip quick-chip" data-prompt="SPN 100 FMI 1: Engine oil pressure low. What is the emergency procedure?">
+              OIL PRESSURE (SPN 100)
+            </button>
+            <button class="shortcut-chip quick-chip" data-prompt="Provide a full health snapshot of current telemetry readings and maintenance recommendations.">
+              TELEMETRY SNAPSHOT
+            </button>
+          </div>
+
+          <!-- Attached Image Preview Bar (Appears when photo is selected) -->
+          <div class="attached-image-bar" id="attachedImageBar" style="display: none;">
+            <div class="attached-thumb-wrap">
+              <img id="attachedImageThumb" src="" alt="Selected machine photo">
+              <button type="button" class="btn-remove-attachment" id="btnRemoveAttachment" title="Remove photo">&times;</button>
+            </div>
+            <div class="attached-info">
+              <span class="attached-name" id="attachedImageName">component.jpg</span>
+              <span class="attached-hint">Ready for visual damage inspection (Moondream AI)</span>
+            </div>
+          </div>
+
+          <!-- WhatsApp Chat Input Form -->
+          <form id="aiChatForm" class="console-input-bar wa-input-form">
+            <!-- Hidden Image File Input -->
+            <input type="file" id="aiImageInput" accept="image/*" style="display: none;">
+
+            <!-- Camera / Photo Attachment Button -->
+            <button type="button" class="btn-attach" id="btnAttachPhoto" title="Attach machinery photo or snap picture">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+            </button>
+
+            <!-- Text Input -->
+            <input type="text" id="aiInput" placeholder="Message MechMind AI or describe symptom..." autocomplete="off">
+
+            <!-- Send Button -->
+            <button type="submit" id="aiSubmitBtn" class="btn-send-wa" title="Send message">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </form>
+        </div>
+
+        <!-- Incident & Alert Log (Tab: Alerts) -->
+        <div class="panel-box alerts-panel tab-section" data-tab-content="alerts">
+          <div class="panel-topbar">
+            <div class="panel-header-title">
+              <span class="panel-mark">■</span>
+              <h3>SYSTEM INCIDENT LOG</h3>
+            </div>
+            <span class="alert-count-pill" id="alertCountBadge">2 LOGS</span>
+          </div>
+
+          <div class="log-entries" id="alertsList">
+            <div class="log-entry warning">
+              <div class="log-tag">WARN</div>
+              <div class="log-body">
+                <div class="log-title">ELEVATED TEMPERATURE THRESHOLD</div>
+                <div class="log-detail">Hydraulic reservoir recorded 86.2°C (Warning baseline: 85.0°C)</div>
+                <div class="log-meta">12m ago · CAT 320 Excavator</div>
+              </div>
+            </div>
+            <div class="log-entry info">
+              <div class="log-tag">INFO</div>
+              <div class="log-body">
+                <div class="log-title">VIBRATION BASELINE ACQUIRED</div>
+                <div class="log-detail">ADXL345 3-axis baseline captured at idle (1.18g RMS)</div>
+                <div class="log-meta">Real ESP32 · Node NODE-001</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- WhatsApp Integration Bar (Tab: Alerts on mobile, full-width footer on desktop) -->
+    <footer class="wa-integration-bar tab-section" data-tab-content="alerts">
+      <div class="wa-bar-left">
+        <div class="wa-terminal-symbol">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="wa-title">FIELD WHATSAPP AGENT — +234 7010299562</div>
+          <p class="wa-sub">Technicians can send voice notes, equipment photos, or text directly via WhatsApp for instant sub-millisecond AI triage.</p>
+        </div>
+      </div>
+      <div class="wa-bar-right">
+        <button class="btn-terminal" id="openQrModalBtn">
+          <span>TERMINAL PAIRING / QR</span>
+        </button>
+      </div>
+    </footer>
+
+  </main>
+
+  <!-- Mobile Bottom Navigation Bar (Visible only on Mobile screens) -->
+  <nav class="mobile-bottom-nav">
+    <button class="nav-item" data-tab="telemetry">
+      <div class="nav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+          <line x1="8" y1="21" x2="16" y2="21"></line>
+          <line x1="12" y1="17" x2="12" y2="21"></line>
+        </svg>
+      </div>
+      <span class="nav-label">Telemetry</span>
+    </button>
+
+    <button class="nav-item active" data-tab="copilot">
+      <div class="nav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+        </svg>
+        <span class="nav-dot-badge"></span>
+      </div>
+      <span class="nav-label">AI Copilot</span>
+    </button>
+
+    <button class="nav-item" data-tab="waveforms">
+      <div class="nav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </div>
+      <span class="nav-label">Waveforms</span>
+    </button>
+
+    <button class="nav-item" data-tab="alerts">
+      <div class="nav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <span class="nav-label">Alerts</span>
+    </button>
+  </nav>
+
+  <!-- WhatsApp Link / Pairing & QR Modal -->
+  <div class="modal-shell" id="qrModal">
+    <div class="modal-window">
+      <div class="modal-top">
+        <div class="modal-title-wrap">
+          <span class="panel-mark">■</span>
+          <h3>WHATSAPP FIELD AGENT LINKING</h3>
+        </div>
+        <button class="btn-close" id="closeQrModalBtn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-content">
+        <!-- Live Connection Status Strip -->
+        <div class="pairing-status-box" id="waConnectionStrip">
+          <div class="terminal-dot" id="waStatusDot"></div>
+          <div class="wa-status-text-wrap">
+            <span class="wa-status-label" id="botStatusModalText">Checking daemon on port 3001...</span>
+            <span class="wa-status-phone" id="botConnectedPhone"></span>
+          </div>
+          <button class="btn-subtle-reset" id="btnResetWaSession" title="Clear session & restart bot if stuck">RESET</button>
+        </div>
+
+        <!-- Mode Selector Tabs -->
+        <div class="wa-tab-bar">
+          <button class="wa-tab active" id="tabBtnPairing" data-tab="pairing">8-DIGIT PAIRING CODE</button>
+          <button class="wa-tab" id="tabBtnQr" data-tab="qr">SCAN QR CODE</button>
+        </div>
+
+        <!-- Tab 1: 8-Digit Pairing Code (Recommended) -->
+        <div class="wa-tab-content active" id="tabContentPairing">
+          <p class="modal-desc">Link directly without camera. Enter your WhatsApp phone number to generate an 8-character verification code:</p>
+          
+          <div class="phone-input-bar">
+            <span class="phone-plus">+</span>
+            <input type="tel" id="waPhoneInput" value="2347010299562" placeholder="e.g. 2347010299562" autocomplete="tel">
+            <button class="btn-request-code" id="btnGetPairingCode">GENERATE CODE</button>
+          </div>
+
+          <!-- Code Display Container -->
+          <div class="pairing-code-box" id="pairingCodeDisplayBox" style="display: none;">
+            <div class="code-header">
+              <span>ENTER CODE IN WHATSAPP:</span>
+              <button class="btn-copy-code" id="btnCopyPairingCode">COPY</button>
+            </div>
+            <div class="pairing-code-number" id="pairingCodeText">--------</div>
+            <div class="code-timer-note" id="pairingCodeNote">Code active. Valid for ~2 minutes.</div>
+          </div>
+
+          <div class="instructions-steps">
+            <div class="step-item"><span class="step-num">1</span><span>Open <strong>WhatsApp</strong> on your phone</span></div>
+            <div class="step-item"><span class="step-num">2</span><span>Tap <strong>Settings</strong> (or Menu <strong>⋮</strong>) → <strong>Linked Devices</strong></span></div>
+            <div class="step-item"><span class="step-num">3</span><span>Tap <strong>Link a Device</strong></span></div>
+            <div class="step-item"><span class="step-num">4</span><span>Tap <strong>"Link with phone number instead"</strong> at bottom</span></div>
+            <div class="step-item"><span class="step-num">5</span><span>Type the 8-character code shown above</span></div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Scan QR Code -->
+        <div class="wa-tab-content" id="tabContentQr" style="display: none;">
+          <p class="modal-desc">Scan with WhatsApp camera (WhatsApp → Linked Devices → Link a Device):</p>
+          
+          <div class="qr-display-container">
+            <div class="qr-frame" id="qrFrame">
+              <img id="waQrImage" src="" alt="WhatsApp Web QR Code" style="display: none;">
+              <div class="qr-loader" id="qrLoader">
+                <div class="loader-spinner"></div>
+                <span id="qrLoaderText">Fetching live QR code...</span>
+              </div>
+            </div>
+            <div class="qr-actions">
+              <button class="btn-refresh-qr" id="btnRefreshQr">REFRESH QR</button>
+              <span class="qr-timer-label" id="qrTimerLabel">Auto-sync active</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer-notes">
+          <span>WhatsApp Bot: <strong>localhost:3001</strong></span>
+          <span>FastAPI Engine: <strong>localhost:8080</strong></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

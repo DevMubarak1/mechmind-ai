@@ -10,7 +10,7 @@
 
 [![Status](https://img.shields.io/badge/Hardware_Status-Physical_Node_Operational-success.svg)](#prototype-device--hardware-architecture)
 [![AI Engine](https://img.shields.io/badge/AI_Engine-Google_Gemma_4_%2B_Gemini_API_%2B_ChromaDB-blue.svg)](#how-google-gemma-powers-mechmind-diagnostics)
-[![Dashboard](https://img.shields.io/badge/Live_Dashboard-mechmind--ng.vercel.app-blue.svg)](https://mechmind-ng.vercel.app)
+[![Dashboard](https://img.shields.io/badge/Live_Dashboard-mechmind--ng.vercel.app%2Fdashboard-blue.svg)](https://mechmind-ng.vercel.app/dashboard)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32_%2B_ADXL345_%2B_DS18B20-orange.svg)](#edge-sensor-node-specifications)
 [![Field Interface](https://img.shields.io/badge/Field_Interface-WhatsApp_Copilot-25D366.svg)](#field-interfaces-zero-friction-delivery)
 [![Pitch Deck](https://img.shields.io/badge/Pitch_Deck-PowerPoint_%2B_PDF-D24726.svg?logo=microsoftpowerpoint)](docs/MechMind_AI_Pitch_Deck.pdf)
@@ -209,7 +209,8 @@ To operate reliably over weak rural 2G/3G networks, MechMind extracts statistica
 
 The centralized management console provides operators and maintenance directors with live operational visibility. The interface polls telemetry **every 2 seconds** and receives sub-second Server-Sent Events (SSE) for critical alerts.
 
-* **Public Web Portal**: [https://mechmind-ng.vercel.app](https://mechmind-ng.vercel.app)
+* **Live Telemetry & Diagnostics Dashboard**: [https://mechmind-ng.vercel.app/dashboard](https://mechmind-ng.vercel.app/dashboard)
+* **Public Overview & Landing Page**: [https://mechmind-ng.vercel.app](https://mechmind-ng.vercel.app)
 * **Local Edge Dashboard**: `http://localhost:8080`
 
 | Real-Time Kinematic Waveform Monitor | Automated Alert Thresholds & Diagnostics Feed |
