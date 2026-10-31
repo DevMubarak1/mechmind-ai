@@ -5,3 +5,4 @@
     { "source": "/dashboard/(.*)", "destination": "/dashboard/$1" }
   ]
 }
+

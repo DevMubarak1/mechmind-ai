@@ -40,7 +40,6 @@
 > 📥 **Direct Presentation Downloads**:
 > * 🖥️ **[Download PowerPoint Deck (.pptx)](docs/MechMind_AI_Pitch_Deck.pptx)** — *Full editable presentation with high-res assets & presenter notes*
 > * 📄 **[Open Presentation PDF](docs/MechMind_AI_Pitch_Deck.pdf)** — *Interactive 9-slide deck viewable directly in GitHub / any browser*
-> * 📋 **[Master Presenter Defense Guide (PDF)](docs/MechMind_AI_MLH_Hack_Day_Presenter_Guide.pdf)** — *Step-by-step 3-minute pitch playbook for judges*
 
 <div align="center">
   <a href="docs/MechMind_AI_Pitch_Deck.pdf">
