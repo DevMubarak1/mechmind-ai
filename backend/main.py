@@ -761,14 +761,24 @@ async def get_readings(equipment_id: int, limit: int = 50):
 @app.get("/api/alerts")
 async def get_alerts(limit: int = 20):
     """Get recent alerts with AI diagnosis"""
-    with SessionLocal() as db:
-        rows = db.execute(text("""
-            SELECT a.id, a.alert_type, a.severity, a.message, a.sensor_value, a.created_at, e.name, a.ai_diagnosis
-            FROM alerts a LEFT JOIN equipment e ON a.equipment_id = e.id
-            ORDER BY a.created_at DESC LIMIT :lim
-        """), {"lim": limit}).fetchall()
-        
-        return [{"id": r[0], "type": r[1], "severity": r[2], "message": r[3], "value": r[4], "time": r[5].isoformat(), "equipment": r[6], "ai_diagnosis": r[7]} for r in rows]
+    try:
+        with SessionLocal() as db:
+            try:
+                rows = db.execute(text("""
+                    SELECT a.id, a.alert_type, a.severity, a.message, a.sensor_value, a.created_at, e.name, a.ai_diagnosis
+                    FROM alerts a LEFT JOIN equipment e ON a.equipment_id = e.id
+                    ORDER BY a.created_at DESC LIMIT :lim
+                """), {"lim": limit}).fetchall()
+                return [{"id": r[0], "type": r[1], "severity": r[2], "message": r[3], "value": r[4], "time": r[5].isoformat(), "equipment": r[6], "ai_diagnosis": r[7]} for r in rows]
+            except Exception:
+                rows = db.execute(text("""
+                    SELECT a.id, a.alert_type, a.severity, a.message, a.sensor_value, a.created_at, e.name
+                    FROM alerts a LEFT JOIN equipment e ON a.equipment_id = e.id
+                    ORDER BY a.created_at DESC LIMIT :lim
+                """), {"lim": limit}).fetchall()
+                return [{"id": r[0], "type": r[1], "severity": r[2], "message": r[3], "value": r[4], "time": r[5].isoformat(), "equipment": r[6], "ai_diagnosis": None} for r in rows]
+    except Exception:
+        return []
 
 
 @app.get("/api/alerts/stream")
