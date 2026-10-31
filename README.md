@@ -195,10 +195,9 @@ The physical edge telemetry node (**NODE-001**) is built for harsh field environ
 ### Edge Signal Processing & Bandwidth Efficiency
 
 To operate reliably over weak rural 2G/3G networks, MechMind extracts statistical indicators directly on the ESP32 before transmission:
-* **Raw 200 Hz Tri-Axial Vibration**: $200\text{ Hz} \times 3\text{ axes} \times 2\text{ bytes} = 1,200\text{ bytes/s}$ ($2,400\text{ B}$ per 2s window).
-* **Raw 16 kHz Audio**: $16,000\text{ samples/s} \times 2\text{ bytes} = 32,000\text{ bytes/s}$.
-* **MechMind Telemetry Burst**: Compact JSON feature payload ($<380\text{ bytes}$ every 2.0s = $\sim 190\text{ bytes/s}$).
-* **Net Bandwidth Reduction**: **84.2% reduction** against raw vibration streaming, and **>99.4% reduction** against raw audio streaming.
+* **Raw Sensor Stream**: streaming raw vibration and audio samples would need about **1.6 MB per minute**.
+* **MechMind Telemetry Burst**: one compact JSON feature payload (~120 bytes) every 2.0s, about **3.6 KB per minute**.
+* **Net Bandwidth Reduction**: **99.88% less data** (1.6 MB/min → 3.6 KB/min), so the node works on weak rural networks.
 
 ---
 
