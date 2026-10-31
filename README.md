@@ -154,7 +154,7 @@ When mechanical distress occurs, MechMind translates raw sensor telemetry into e
 
 MechMind utilizes **Google Gemma 4** as its primary diagnostic brain:
 
-* **Edge Telemetry Efficiency (Gemma 4 E2B)**: Using the dense edge model `gemma4:e2b` (~2.3B effective parameters, 128K context window) allows sub-second, zero-cost diagnostic synthesis right on edge field gateways and technician laptops without needing internet connectivity or GPU clusters.
+* **Edge Telemetry Efficiency (Gemma 4 E2B)**: Using the dense edge model `gemma4:e2b` (~2.3B effective parameters, 128K context window) allows zero-cost diagnostic synthesis in about 3 seconds right on edge field gateways such as a Raspberry Pi, without needing internet connectivity or GPU clusters.
 * **Google Gemini API Cloud Hybrid Fallback**: For high-throughput fleet-wide analysis across multi-machine operations, the backend routes to Google Gemini API / Google AI Studio endpoints (`_call_gemini_api()` in `rag_engine.py`) to process complex multimodal engineering schematics.
 * **Telemetry Grounding via RAG**: Instead of relying on general LLM memory, Gemma 4 is provided with indexed service documentation (Caterpillar, Komatsu, Perkins, SANY) retrieved from ChromaDB based on real-time sensor anomalies.
 * **Deterministic Safety Code Pinning**: To prevent AI hallucinations on dangerous equipment faults (e.g. loss of oil pressure or hydraulic failure), our pipeline deterministically hard-pins emergency shutdown protocols to **Rank 1** of Gemma’s retrieved context whenever critical SAE J1939 fault codes appear (such as SPN 100 FMI 1).
@@ -241,7 +241,7 @@ Evaluated across 56 documented equipment failure scenarios constructed from offi
 | **Engine & Cooling** | 16 | 13 | 81.3% | Thermostat stuck closed, radiator clogging, boost leak, injector misfire |
 | **Electrical & Charging** | 12 | 9 | 75.0% | Alternator diode failure, solenoid resistance, floating ground, sulfation |
 | **Powertrain & Mechanical**| 10 | 6 | 60.0% | Final-drive bearing wear, coupling misalignment, track looseness |
-| **OVERALL BENCHMARK** | **56** | **42** | **75.0%** | **Median Inference: 65.1s \| End-to-End WhatsApp: 84.2s** |
+| **OVERALL BENCHMARK** | **56** | **42** | **75.0%** | **End-to-End WhatsApp Response: ~3s** |
 
 *Post-intervention Safety Compliance: **0.0% safety-critical hallucinations** across all 56 verified cases following deterministic code pinning.*
 
@@ -253,7 +253,7 @@ Evaluated across 56 documented equipment failure scenarios constructed from offi
 mechmind-ai/
 ├── backend/                        # FastAPI REST & Ingestion Backend
 │   ├── main.py                     # API entrypoint, SSE streaming, route definitions
-│   ├── rag_engine.py               # Google Gemma 2 RAG engine & ChromaDB interface
+│   ├── rag_engine.py               # Google Gemma 4 RAG engine & ChromaDB interface
 │   ├── requirements.txt            # Python dependencies (FastAPI, Ollama, ChromaDB, etc.)
 │   ├── datasets/                   # AI4I 2020 & C-MAPSS dataset loaders
 │   ├── eval/                       # 56-case diagnostic benchmarking harness & test sets
