@@ -9,7 +9,7 @@
 [![Track: Best Open-Source AI](https://img.shields.io/badge/Track-Best_Open--Source_AI-10B981?style=for-the-badge&logo=opensourceinitiative)](LICENSE)
 
 [![Status](https://img.shields.io/badge/Hardware_Status-Physical_Node_Operational-success.svg)](#prototype-device--hardware-architecture)
-[![AI Engine](https://img.shields.io/badge/AI_Engine-Google_Gemma_4_%2B_Gemini_API_%2B_ChromaDB-blue.svg)](#how-google-gemma-powers-mechmind-diagnostics)
+[![AI Engine](https://img.shields.io/badge/AI_Engine-Google_Gemma_4_%2B_Gemini_API_%2B_ChromaDB-blue.svg)](#how-google-gemma-4-powers-mechmind-diagnostics)
 [![Dashboard](https://img.shields.io/badge/Live_Dashboard-mechmind--ng.vercel.app%2Fdashboard-blue.svg)](https://mechmind-ng.vercel.app/dashboard)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32_%2B_ADXL345_%2B_DS18B20-orange.svg)](#edge-sensor-node-specifications)
 [![Field Interface](https://img.shields.io/badge/Field_Interface-WhatsApp_Copilot-25D366.svg)](#field-interfaces-zero-friction-delivery)
@@ -68,7 +68,7 @@
 - [Executive Overview](#executive-overview)
 - [The Problem: The Diagnostic Divide in Emerging Fleets](#the-problem-the-diagnostic-divide-in-emerging-fleets)
 - [System Architecture](#system-architecture)
-- [How Google Gemma 4 Powers MechMind Diagnostics](#how-google-gemma-powers-mechmind-diagnostics)
+- [How Google Gemma 4 Powers MechMind Diagnostics](#how-google-gemma-4-powers-mechmind-diagnostics)
 - [Prototype Device & Hardware Architecture](#prototype-device--hardware-architecture)
   - [Hardware Gallery & Physical Node Views](#hardware-gallery--physical-node-views)
   - [CAD & Electrical Schematics](#cad--electrical-schematics)
@@ -79,7 +79,7 @@
   - [2. WhatsApp Mobile Diagnostic Copilot](#2-whatsapp-mobile-diagnostic-copilot)
 - [56-Case Blind Diagnostic Benchmark](#56-case-blind-diagnostic-benchmark)
 - [Repository Structure](#repository-structure)
-- [Quickstart: Running with Google Gemma 4](#quickstart-running-with-google-gemma--gemini-apis)
+- [Quickstart: Running with Google Gemma 4](#quickstart-running-with-google-gemma-4--gemini-apis)
 - [Engineering Team](#engineering-team)
 - [License](#license)
 
