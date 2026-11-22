@@ -753,7 +753,7 @@ async def get_equipment():
                 return [{"id": r[0], "name": r[1], "type": r[2], "model": r[3], "location": r[4], "status": r[5], "node_id": r[6]} for r in rows]
     except Exception:
         pass
-    return [{"id": 1, "name": "CAT 320 Excavator", "type": "excavator", "model": "320D", "location": "Site A - Lekki", "status": "active", "node_id": "NODE-001"}]
+    return [{"id": 1, "name": "Heavy Machinery", "type": "universal", "model": "NODE-001", "location": "Site A - Field", "status": "active", "node_id": "NODE-001"}]
 
 @app.get("/api/equipment/{equipment_id}/readings")
 async def get_readings(equipment_id: int, limit: int = 50):

@@ -1,15 +1,15 @@
 # MechMind AI 🚜⚡🧠
 
-> **Edge-Enabled Industrial Telemetry & Generative Diagnostic Copilot for Heavy Machinery, Construction Equipment, and Agricultural Fleets**  
-> *Built for the MLH Hacktoberfest Hack Day 2026*
+> **Non-Invasive Industrial Telemetry & Multimodal Diagnostic Copilot for Heavy Machinery, Agricultural Tractors, and Construction Fleets**  
+> *Developed by Lagos State University (LASU) Engineering for the National Automation Prize (NAP) 2026 & NAEng Innovation Competition*
 
 [![MLH Hack Day 2026](https://img.shields.io/badge/MLH_Hacktoberfest-Hack_Day_2026-FF6B4A?style=for-the-badge&logo=majorleaguehacking)](https://mlh.io)
-[![Track: Leverage Gemma 4](https://img.shields.io/badge/Track-Leverage_Gemma_4_Google_AI-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/gemma)
+[![Competition](https://img.shields.io/badge/Competition-National_Automation_Prize_2026-FF6B4A?style=for-the-badge)](https://nap.ng)
 [![Track: DigitalOcean Open-Source AI](https://img.shields.io/badge/Track-DigitalOcean_AI_Challenge-0080FF?style=for-the-badge&logo=digitalocean)](deploy/digitalocean)
 [![Track: Best Open-Source AI](https://img.shields.io/badge/Track-Best_Open--Source_AI-10B981?style=for-the-badge&logo=opensourceinitiative)](LICENSE)
 
 [![Status](https://img.shields.io/badge/Hardware_Status-Physical_Node_Operational-success.svg)](#prototype-device--hardware-architecture)
-[![AI Engine](https://img.shields.io/badge/AI_Engine-Google_Gemma_4_%2B_Gemini_API_%2B_ChromaDB-blue.svg)](#how-google-gemma-4-powers-mechmind-diagnostics)
+[![AI Engine](https://img.shields.io/badge/AI_Engine-Meta_Llama_3.2_(3B)_%2B_Moondream_Vision-blue.svg)](#how-ai-powers-mechmind-diagnostics)
 [![Dashboard](https://img.shields.io/badge/Live_Dashboard-mechmind--ng.vercel.app%2Fdashboard-blue.svg)](https://mechmind-ng.vercel.app/dashboard)
 [![Hardware](https://img.shields.io/badge/Hardware-ESP32_%2B_ADXL345_%2B_DS18B20-orange.svg)](#edge-sensor-node-specifications)
 [![Field Interface](https://img.shields.io/badge/Field_Interface-WhatsApp_Copilot-25D366.svg)](#field-interfaces-zero-friction-delivery)
@@ -53,7 +53,7 @@
 | Slide 02: The Breakdown Trap | Slide 03: How MechMind Works | Slide 04: The Edge Sensor Node |
 | :---: | :---: | :---: |
 | <img src="docs/images/pitch_deck_slide_2.png" width="280px" alt="Slide 2: The Problem" /> | <img src="docs/images/pitch_deck_slide_3.png" width="280px" alt="Slide 3: How MechMind Works" /> | <img src="docs/images/pitch_deck_slide_4.png" width="280px" alt="Slide 4: Sensor Node" /> |
-| *One breakdown strands heavy machinery for weeks.* | *Google Gemma 4 acts as the cognitive diagnostic brain.* | *Non-invasive magnetic clamping with 30-second install.* |
+| *One breakdown strands heavy machinery for weeks.* | *Meta Llama 3.2 (3B) & Moondream Vision act as the diagnostic brain.* | *Non-invasive magnetic clamping with 30-second install.* |
 
 | Slide 06: Grounded OEM Manual RAG | Slide 07: Gemini API + DigitalOcean Stack | Slide 08: WhatsApp Field Copilot |
 | :---: | :---: | :---: |
@@ -125,11 +125,11 @@ When mechanical distress occurs, MechMind translates raw sensor telemetry into e
             +-------------------+-------------------+
                                 v
    +-------------------------------------------------------+
-   |          Google Gemma 4 RAG Cognitive Engine          |
-   |   • Model: Google Gemma 4 (gemma4:e2b / Gemini API)   |
-   |   • Semantic Context Synthesis via ChromaDB Embeddings|
-   |   • Deterministic Safety Pinning (SPN 100 Emergency)  |
-   |   • Structured Cause-Probability & Inspection Sequence|
+   |      Meta Llama 3.2 (3B) + Moondream Vision RAG       |
+   |   • Model: Meta Llama 3.2 (3B) on local NVIDIA GPU    |
+   |   • Vision: Moondream 1.7B for component inspection   |
+   |   • RAG Context from 1,200+ Pages OEM Service Manuals |
+   |   • Universal Heavy Machinery Diagnostic Intelligence |
    +-------------------------------------------------------+
             |                                       |
             v                                       v
@@ -150,7 +150,7 @@ When mechanical distress occurs, MechMind translates raw sensor telemetry into e
 
 ---
 
-## How Google Gemma 4 Powers MechMind Diagnostics
+## How AI Powers MechMind Diagnostics (Llama 3.2 + Moondream Vision)
 
 MechMind utilizes **Google Gemma 4** as its primary diagnostic brain:
 

@@ -500,7 +500,7 @@ async function fetchAlerts() {
       message: 'ADXL345 Kinematic telemetry synchronized for CAT 320 (NODE-001). Sampling at 100Hz.',
       equipment: 'CAT 320',
       time: new Date(Date.now() - 35000).toISOString(),
-      ai_diagnosis: 'Google Gemma 4 verified baseline vibration spectrum within ISO 10816 Class II industrial standards.'
+      ai_diagnosis: 'Llama 3.2 verified baseline vibration spectrum within ISO 10816 Class II industrial standards.'
     },
     {
       severity: 'warning',
@@ -578,9 +578,9 @@ function getOfflineGemmaDiagnosis(msg) {
 
   // 1. Greetings & General Inquiries
   if (/^(hi|hello|hey|greetings|morning|afternoon|yo|sup|help|who\s+are\s+you)\b/i.test(q) || q === 'hi' || q === 'hello' || q === 'hey') {
-    return `Hello! MechMind Gemma 4 Telemetry Copilot is online and monitoring ${machineName}.\n\n` +
+    return `Hello! MechMind Diagnostic Copilot is online and monitoring ${machineName}.\n\n` +
       `• Live Asset Status: Temp ${currentTemp}°C · Vibration ${currentVib}g · Normal\n` +
-      `• AI Model: Google Gemma 4:E2B Edge Model\n` +
+      `• AI Model: Meta Llama 3.2 (3B) + Moondream Vision\n` +
       `• Knowledge Base: OEM Technical Manuals (Caterpillar, Komatsu, Perkins, Cummins, John Deere), SAE J1939 Standards\n\n` +
       `How can I assist your diagnostic inspection? You can ask:\n` +
       `1. "How to fix an excavator with overheating issues?"\n` +
@@ -666,7 +666,7 @@ function getOfflineGemmaDiagnosis(msg) {
   if (sound > 90) { soundStatus = 'HIGH — Possible mechanical knock or cavitation.'; }
   else if (sound > 75) { soundStatus = 'ELEVATED — Monitor for developing anomaly.'; }
 
-  return `MECHMIND GEMMA 4 — LIVE TELEMETRY DIAGNOSTIC REPORT:\n\n` +
+  return `MECHMIND AI (LLAMA 3.2) — LIVE TELEMETRY DIAGNOSTIC REPORT:\n\n` +
     `Machine: ${machineName}\n` +
     `Sensors: ESP32 Edge Node (ADXL345 + DS18B20 + INMP441)\n\n` +
     `THERMAL ANALYSIS (DS18B20 Digital Probe):\n` +
@@ -687,7 +687,7 @@ function getOfflineGemmaDiagnosis(msg) {
 }
 
 function getOfflineGemmaVisionDiagnosis(caption) {
-  return `VISUAL TELEMETRY ANALYSIS — GEMMA 4 MULTIMODAL VISION:\n\n` +
+  return `VISUAL TELEMETRY ANALYSIS — MOONDREAM MULTIMODAL VISION:\n\n` +
     `• Target Component: Heavy Machinery Hydraulic Pump / Cooling Core Assembly\n` +
     `• Observation: Heat discoloration and particulate contamination detected along fin perimeter.\n` +
     `• Thermal Correlation: Visual patterns correspond with chronic elevated operating temperatures (>80°C).\n` +
@@ -742,7 +742,7 @@ function setupEventListeners() {
         <div class="wa-bubble wa-bubble-ai">
           <div class="wa-sender-tag">
             <span class="wa-sender-name">MECHMIND ENGINE</span>
-            <span class="wa-model-badge">GOOGLE GEMMA 4:E2B</span>
+            <span class="wa-model-badge">LLAMA 3.2 (3B)</span>
           </div>
           <div class="wa-message-text">
             Diagnostic session refreshed.<br><br>
@@ -970,7 +970,7 @@ function showTypingIndicator() {
   div.innerHTML = `
     <div class="wa-sender-tag">
       <span class="wa-sender-name">MECHMIND ENGINE</span>
-      <span class="wa-model-badge">GOOGLE GEMMA 4:E2B</span>
+      <span class="wa-model-badge">LLAMA 3.2 (3B)</span>
     </div>
     <div class="wa-typing-indicator">
       <span class="wa-typing-dot"></span>
@@ -1010,7 +1010,7 @@ function appendWhatsAppMessage(sender, text, isUser = false, imageUrl = null) {
     div.innerHTML = `
       <div class="wa-sender-tag">
         <span class="wa-sender-name">MECHMIND ENGINE</span>
-        <span class="wa-model-badge">GOOGLE GEMMA 4:E2B</span>
+        <span class="wa-model-badge">LLAMA 3.2 (3B)</span>
       </div>
       <div class="wa-message-text">${formatMarkdown(text)}</div>
       <div class="wa-msg-meta">
