@@ -20,6 +20,18 @@ const BOT_PORT = process.env.BOT_PORT || 3001;
 const AUTH_DIR = path.join(__dirname, 'auth_info');
 const ALERT_RECIPIENTS = (process.env.ALERT_RECIPIENTS || '2347010299562').split(',').filter(Boolean);
 
+// Prevent unhandled socket/crypto exceptions in Baileys from terminating the bot process
+process.on('uncaughtException', (err) => {
+    console.error('[BOT CRASH GUARD - UNCAUGHT EXCEPTION]:', err.message || err);
+    if (err.message && (err.message.includes('Connection Closed') || err.message.includes('Bad MAC') || err.message.includes('Precondition Required'))) {
+        console.log('[BOT CRASH GUARD] Suppressed transient Baileys socket error. Bot remains running.');
+    }
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('[BOT CRASH GUARD - UNHANDLED REJECTION]:', reason?.message || reason);
+});
+
 // Express app for internal API (receives alerts & serves dashboard QR/pairing)
 const apiApp = express();
 apiApp.use(express.json());
@@ -339,12 +351,6 @@ async function handleMessage(msg, sender) {
 
             // Tier 1: Two-Phase Instant Acknowledgment (< 5ms) + Deep RAG Reasoning
             await handleTextQuery(sender, phoneNumber, text, lower);
-        } else if (msgContent.audioMessage) {
-            console.log('   Audio message received from', sender);
-            await handleAudioMessage(msg, sender, phoneNumber);
-        } else if (msgContent.imageMessage) {
-            console.log('   Image message received from', sender);
-            await handleImageMessage(msg, sender, phoneNumber);
         }
     } catch (err) {
         console.error('Error handling message:', err);
