@@ -10,11 +10,16 @@ import glob
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 
-import chromadb
-from chromadb.utils import embedding_functions
+# chromadb replaced with lightweight in-memory retrieval (Python 3.14 compat)
+# import chromadb  # not available on Python 3.14
+# from chromadb.utils import embedding_functions
 import ollama
 
 logger = logging.getLogger("mechmind.rag")
+
+# Force ollama client to use localhost (not 127.0.0.1) to avoid "Direct IP access" error in Ollama 0.34+
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
+_ollama_client = ollama.Client(host=OLLAMA_HOST)
 
 CHROMA_URL = os.getenv("CHROMA_URL", "http://localhost:8100")
 # Google Gemma 4 E2B edge model default, fallback to gemma4 or gemma2:2b
@@ -46,44 +51,37 @@ def get_embedding_function():
 
 
 def get_chroma_client():
+    """Return in-memory chunk store (list of dicts) instead of ChromaDB."""
     global _chroma_client
     if _chroma_client is None:
-        try:
-            host = "localhost"
-            port = 8100
-            if "://" in CHROMA_URL:
-                parts = CHROMA_URL.split("://")[1].split(":")
-                host = parts[0]
-                if len(parts) > 1:
-                    port = int(parts[1].split("/")[0])
-            _chroma_client = chromadb.HttpClient(host=host, port=port)
-            _chroma_client.heartbeat()
-            logger.info(f"Connected to ChromaDB HTTP at {host}:{port}")
-        except Exception as e:
-            logger.warning(f"Could not connect to ChromaDB HTTP ({e}), using local PersistentClient")
-            local_db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "chroma_data"))
-            _chroma_client = chromadb.PersistentClient(path=local_db_path)
+        _chroma_client = []
+        _auto_ingest_knowledge()
     return _chroma_client
 
 
+def _auto_ingest_knowledge():
+    """Load all knowledge .md/.txt files into memory on startup."""
+    global _chroma_client
+    if _chroma_client is None:
+        _chroma_client = []
+    md_files = glob.glob(os.path.join(KNOWLEDGE_DIR, "*.md")) + glob.glob(os.path.join(KNOWLEDGE_DIR, "*.txt"))
+    for fpath in md_files:
+        fname = os.path.basename(fpath)
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                content_txt = f.read()
+            chunks = chunk_document(content_txt, fname)
+            for c in chunks:
+                _chroma_client.append(c)
+        except Exception as e:
+            logger.error(f"Error reading file {fpath}: {e}")
+    logger.info(f"In-memory RAG: loaded {len(_chroma_client)} chunks from {len(md_files)} knowledge files")
+
+
+
 def get_or_create_collection():
-    global _collection
-    if _collection is not None:
-        return _collection
-    client = get_chroma_client()
-    emb_fn = get_embedding_function()
-    try:
-        _collection = client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            embedding_function=emb_fn,
-            metadata={"description": "Heavy Machinery Diagnostic Manuals and Fault Codes"}
-        )
-        count = _collection.count()
-        logger.info(f"Collection ready. Count: {count}")
-    except Exception as e:
-        logger.error(f"Failed to get/create ChromaDB collection: {e}")
-        _collection = None
-    return _collection
+    """Return the in-memory chunk store (replaces ChromaDB collection)."""
+    return get_chroma_client()
 
 
 def chunk_document(content: str, filename: str) -> List[Dict[str, Any]]:
@@ -127,92 +125,70 @@ def chunk_document(content: str, filename: str) -> List[Dict[str, Any]]:
 
 
 def ingest_knowledge_base() -> Dict[str, Any]:
-    collection = get_or_create_collection()
-    if not collection:
-        return {"status": "error", "message": "ChromaDB collection unavailable"}
-    md_files = glob.glob(os.path.join(KNOWLEDGE_DIR, "*.md")) + glob.glob(os.path.join(KNOWLEDGE_DIR, "*.txt"))
-    if not md_files:
-        return {"status": "warning", "message": "No files found", "files": 0, "chunks": 0}
-    all_chunks = []
-    for fpath in md_files:
-        fname = os.path.basename(fpath)
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                content_txt = f.read()
-            all_chunks.extend(chunk_document(content_txt, fname))
-        except Exception as e:
-            logger.error(f"Error reading file {fpath}: {e}")
-    if not all_chunks:
-        return {"status": "warning", "message": "No chunks extracted", "chunks": 0}
-    batch_size = 50
-    upserted_count = 0
-    for i in range(0, len(all_chunks), batch_size):
-        batch = all_chunks[i:i + batch_size]
-        try:
-            collection.upsert(
-                ids=[c["id"] for c in batch],
-                documents=[c["text"] for c in batch],
-                metadatas=[c["metadata"] for c in batch]
-            )
-            upserted_count += len(batch)
-        except Exception as e:
-            logger.error(f"Error upserting batch: {e}")
-    logger.info(f"Ingested {upserted_count} chunks from {len(md_files)} files")
-    return {"status": "success", "files_ingested": len(md_files), "chunks_upserted": upserted_count, "total_collection_count": collection.count()}
+    """Re-ingest knowledge files into in-memory store."""
+    global _chroma_client
+    _chroma_client = None  # reset
+    store = get_chroma_client()  # triggers _auto_ingest_knowledge
+    return {"status": "success", "chunks": len(store)}
 
 
 def retrieve_context(query: str, top_k: int = 4) -> str:
-    collection = get_or_create_collection()
-    if not collection:
+    """Keyword-based retrieval from in-memory chunk store (replaces ChromaDB vector search)."""
+    store = get_or_create_collection()
+    if not store:
         return ""
-    try:
-        exact_docs = []
-        exact_ids = set()
-        spn_fmi_match = re.search(r'SPN\s*(\d+)\s*(?:FMI|\/)\s*(\d+)', query, re.IGNORECASE)
-        if spn_fmi_match:
-            target_id = f"j1939_spn_{spn_fmi_match.group(1)}_fmi_{spn_fmi_match.group(2)}"
-            try:
-                matched_item = collection.get(ids=[target_id])
-                if matched_item and matched_item.get("documents") and len(matched_item["documents"]) > 0:
-                    exact_docs.append(matched_item["documents"][0])
-                    exact_ids.add(target_id)
-                    logger.info(f"Pinned exact alphanumeric fault code match: {target_id}")
-            except Exception as id_err:
-                logger.debug(f"Direct ID lookup yielded no match: {id_err}")
-        q_lower = query.lower()
+
+    q_lower = query.lower()
+    q_words = set(re.findall(r'[a-z0-9]+', q_lower))
+
+    # Score each chunk by keyword overlap
+    scored = []
+    for chunk in store:
+        text_lower = chunk["text"].lower()
+        text_words = set(re.findall(r'[a-z0-9]+', text_lower))
+        # Count matching words (weighted: longer words score more)
+        score = 0
+        for w in q_words:
+            if len(w) < 3:
+                continue
+            if w in text_lower:
+                score += len(w)
+            # Partial matches for technical terms
+            for tw in text_words:
+                if len(tw) >= 4 and (w in tw or tw in w):
+                    score += 1
+        # Boost exact phrase matches
+        for phrase_len in [4, 3, 2]:
+            q_ngrams = [' '.join(q_lower.split()[i:i+phrase_len]) for i in range(len(q_lower.split()) - phrase_len + 1)]
+            for ng in q_ngrams:
+                if ng in text_lower:
+                    score += phrase_len * 5
+
+        # Brand exclusion
         excluded_brand = None
         if "sany" in q_lower or "sy215" in q_lower:
             excluded_brand = "XCMG"
         elif "xcmg" in q_lower or "xe215" in q_lower:
             excluded_brand = "SANY"
-        query_k = min(max(1, top_k - len(exact_docs)) + len(exact_ids) + 6, collection.count())
-        results = collection.query(query_texts=[query], n_results=query_k)
-        raw_docs = results.get("documents", [[]])[0]
-        raw_ids = results.get("ids", [[]])[0]
-        raw_metas = results.get("metadatas", [[]])[0]
-        final_docs = list(exact_docs)
-        for doc_text, doc_id, meta in zip(raw_docs, raw_ids, raw_metas):
-            if doc_id in exact_ids:
-                continue
-            if excluded_brand:
-                if (excluded_brand in str(meta.get("equipment_model", "")).upper() or
-                        excluded_brand in str(meta.get("source", "")).upper() or
-                        excluded_brand in str(doc_id).upper() or
-                        excluded_brand in str(doc_text[:200]).upper()):
-                    continue
-            if doc_text not in final_docs:
-                final_docs.append(doc_text)
-            if len(final_docs) >= top_k:
-                break
-        if not final_docs:
-            return ""
-        parts = []
-        for i, doc in enumerate(final_docs, 1):
-            parts.append(f"--- REFERENCE PASSAGE {i} ---\n{doc.strip()}")
-        return "\n\n".join(parts)
-    except Exception as e:
-        logger.error(f"ChromaDB retrieval query failed: {e}")
+        if excluded_brand and excluded_brand.lower() in text_lower:
+            score = 0
+
+        if score > 0:
+            scored.append((score, chunk))
+
+    # Sort by score descending, take top_k
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top_chunks = [c for _, c in scored[:top_k]]
+
+    if not top_chunks:
         return ""
+
+    parts = []
+    for i, chunk in enumerate(top_chunks, 1):
+        source = chunk.get("metadata", {}).get("source", "knowledge")
+        parts.append(f"[Reference {i} — {source}]\n{chunk['text']}")
+    return "\n\n".join(parts)
+
 
 
 # ---------------------------------------------------------------------------
@@ -221,8 +197,14 @@ def retrieve_context(query: str, top_k: int = 4) -> str:
 
 # Strict grounded diagnostic - only fires when ChromaDB returned relevant context
 SYSTEM_PROMPT = (
-    "You are MechMind AI, an expert heavy construction machinery diagnostic assistant. "
+    "You are MechMind AI, an expert heavy machinery diagnostic assistant. "
+    "You diagnose ALL types of heavy equipment — tractors, excavators, generators, loaders, bulldozers, cranes, forklifts, compressors, and more. "
     "You assist field mechanics, site supervisors, and operators.\n\n"
+    "EQUIPMENT IDENTIFICATION RULE:\n"
+    "- The sensor node measures temperature, vibration, and sound — these apply to ANY machine.\n"
+    "- If the operator mentions a specific machine type (tractor, generator, loader, etc.), diagnose for THAT machine type.\n"
+    "- Do NOT assume or override the operator's machine type. If they say tractor, diagnose the tractor.\n"
+    "- If no machine type is specified, refer to the asset name from the fleet metrics.\n\n"
     "MULTIMODAL & CONVERSATION MEMORY:\n"
     "- You receive and analyze equipment photos, component diagrams, and voice notes from technicians on WhatsApp.\n"
     "- If the operator mentions an image or previous inspection ('the image I sent', 'the picture', 'how to fix the wheel', 'that problem', 'it'), "
@@ -260,7 +242,7 @@ SYSTEM_PROMPT = (
 
 # Permissive chat path - greetings, identity, small talk
 CHAT_SYSTEM_PROMPT = (
-    "You are MechMind AI, a diagnostic assistant for heavy construction machinery.\n\n"
+    "You are MechMind AI, a diagnostic assistant for ALL heavy machinery (tractors, excavators, generators, loaders, cranes, bulldozers, forklifts, and more).\n\n"
     "You receive and analyze equipment photos and audio notes from technicians on WhatsApp. "
     "If the operator mentions an image or previous inspection ('the image I sent', 'the wheel', 'that problem'), "
     "use the details from [RECENT CONVERSATION & PREVIOUS INSPECTIONS] to provide direct help. "
@@ -274,7 +256,7 @@ CHAT_SYSTEM_PROMPT = (
 
 # General equipment knowledge - opinions, brand comparisons, concepts (no specific fact requests)
 GENERAL_EQUIPMENT_PROMPT = (
-    "You are MechMind AI, a diagnostic assistant for heavy construction machinery.\n\n"
+    "You are MechMind AI, a diagnostic assistant for ALL heavy machinery (tractors, excavators, generators, loaders, cranes, bulldozers, forklifts, and more).\n\n"
     "You receive and analyze equipment photos and audio notes from technicians on WhatsApp. "
     "If the operator mentions an image or previous inspection ('the image I sent', 'how to fix the wheel', 'that problem'), "
     "use the details from [RECENT CONVERSATION & PREVIOUS INSPECTIONS] to provide step-by-step mechanical guidance. "
@@ -571,7 +553,7 @@ def _call_ollama(system_prompt: str, user_prompt: str, max_tokens: int = 200) ->
 
     model_name = OLLAMA_MODEL
     try:
-        response = ollama.chat(
+        response = _ollama_client.chat(
             model=model_name,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -601,7 +583,7 @@ def _call_ollama_prefill(system_prompt: str, user_prompt: str, prefill: str) -> 
     """
     model_name = OLLAMA_MODEL
     try:
-        response = ollama.chat(
+        response = _ollama_client.chat(
             model=model_name,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -747,10 +729,14 @@ def diagnose_with_rag(query_text: str, sensor_context: str = "", conversation_hi
         ts_val = ts_match.group(1) if ts_match else "Live"
         
         q_lower = query_text.lower()
+        # Extract machine name from sensor context dynamically
+        asset_match = re.search(r"Active Inspected Asset:\s*(.+?)(?:\n|$)", sensor_context)
+        machine_name = asset_match.group(1).strip() if asset_match else "Monitored Equipment (NODE-001)"
+
         if "temp" in q_lower or "hot" in q_lower:
             return (
                 f"CURRENT HYDRAULIC & AMBIENT TEMPERATURE:\n"
-                f"- Monitored Machine: CAT 320 (NODE-001)\n"
+                f"- Monitored Machine: {machine_name}\n"
                 f"- Live Reading: {temp_val}°C (Logged at {ts_val})\n"
                 f"- Operating Status: Normal baseline (within standard operating range).\n"
                 f"- Current Vibration: {vib_val}g | Acoustic Noise: {sound_val} dB"
@@ -758,21 +744,21 @@ def diagnose_with_rag(query_text: str, sensor_context: str = "", conversation_hi
         elif "vib" in q_lower:
             return (
                 f"CURRENT VIBRATION TELEMETRY:\n"
-                f"- Monitored Machine: CAT 320 (NODE-001)\n"
+                f"- Monitored Machine: {machine_name}\n"
                 f"- Live Vibration: {vib_val}g (Logged at {ts_val})\n"
                 f"- Operating Status: Stable baseline (normal 1g gravitational alignment)."
             )
         elif "sound" in q_lower or "noise" in q_lower:
             return (
                 f"CURRENT ACOUSTIC NOISE TELEMETRY:\n"
-                f"- Monitored Machine: CAT 320 (NODE-001)\n"
+                f"- Monitored Machine: {machine_name}\n"
                 f"- Live Noise Level: {sound_val} dB (Logged at {ts_val})\n"
                 f"- Operating Status: Normal ambient / idle acoustic envelope."
             )
         else:
             return (
                 f"CURRENT SENSOR TELEMETRY:\n"
-                f"- Machine: CAT 320 (NODE-001)\n"
+                f"- Machine: {machine_name}\n"
                 f"- Temperature: {temp_val}°C\n"
                 f"- Vibration: {vib_val}g\n"
                 f"- Acoustic Level: {sound_val} dB\n"

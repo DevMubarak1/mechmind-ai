@@ -59,6 +59,8 @@ SessionLocal = sessionmaker(bind=engine)
 
 # Ollama config — Google Gemma 4 (E2B edge model default, fallback to gemma4 or gemma2:2b)
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
+_ollama_client = ollama.Client(host=OLLAMA_HOST)
 WHATSAPP_BOT_URL = os.getenv("WHATSAPP_BOT_URL", "http://localhost:3001")
 
 # ========================
@@ -170,7 +172,7 @@ async def health():
     
     # Check Ollama
     try:
-        models = ollama.list()
+        models = _ollama_client.list()
         checks["ollama"] = True
         checks["models"] = [getattr(m, 'model', getattr(m, 'name', str(m))) for m in getattr(models, 'models', [])]
     except Exception as e:
@@ -463,12 +465,37 @@ async def diagnose(query: DiagnosticQuery):
         active_alerts_count = db.execute(text("SELECT COUNT(*) FROM alerts WHERE acknowledged = FALSE AND created_at > NOW() - INTERVAL '24 hours'")).scalar() or 0
         diagnostics_today = db.execute(text("SELECT COUNT(*) FROM diagnostic_sessions WHERE created_at > CURRENT_DATE")).scalar() or 0
 
-        # Identify target equipment
-        active_name = "Unknown Asset"
-        for r in eq_rows:
-            if r[0] == query.equipment_id:
-                active_name = f"{r[1]} (Model {r[3]}, Node {r[6]}, Status: {r[5].title()})"
+        # Identify target equipment — detect if user mentions specific machinery
+        mentioned_type = None
+        q_lower = (query.message or "").lower()
+        machinery_types = {
+            "tractor": "Agricultural Tractor",
+            "generator": "Diesel Generator",
+            "gen": "Diesel Generator",
+            "excavator": "Hydraulic Excavator",
+            "loader": "Wheel Loader",
+            "bulldozer": "Bulldozer",
+            "dozer": "Bulldozer",
+            "crane": "Mobile Crane",
+            "forklift": "Industrial Forklift",
+            "roller": "Compactor Roller",
+            "grader": "Motor Grader",
+            "truck": "Haul Truck",
+            "pump": "Industrial Pump Station"
+        }
+        for kw, full_name in machinery_types.items():
+            if re.search(r'\b' + re.escape(kw) + r'\b', q_lower):
+                mentioned_type = full_name
                 break
+
+        if mentioned_type:
+            active_name = f"{mentioned_type} [NODE-001] (Live Monitored Asset)"
+        else:
+            active_name = "Heavy Machinery [NODE-001] (Live Monitored Asset)"
+            for r in eq_rows:
+                if r[0] == query.equipment_id:
+                    active_name = f"{r[1]} (Model {r[3]}, Node {r[6]}, Status: {r[5].title()})"
+                    break
 
         # Recent sensor readings for active asset
         readings_text = ""
@@ -652,22 +679,31 @@ async def diagnose_image(file: UploadFile = File(...), phone_number: str = Form(
     user_caption = caption or "Visual inspection of equipment component"
     vision_response = None
 
-    # Check if Ollama has a vision model
+    # Check if Ollama has a vision model and use base64 encoding
     try:
-        models_data = ollama.list()
+        import base64
+        with open(tmp_path, "rb") as img_f:
+            img_b64 = base64.b64encode(img_f.read()).decode("utf-8")
+
+        models_data = _ollama_client.list()
         avail_models = [getattr(m, 'model', getattr(m, 'name', str(m))) for m in getattr(models_data, 'models', [])]
         vision_model = next((m for m in avail_models if any(k in m.lower() for k in ["vision", "llava", "moondream"])), None)
 
         if vision_model:
-            res = ollama.chat(
+            logger.info(f"Running visual inspection with vision model: {vision_model}")
+            res = _ollama_client.chat(
                 model=vision_model,
                 messages=[{
                     "role": "user",
-                    "content": f"You are MechMind AI. Inspect this construction machinery component photo. User notes: '{user_caption}'. Identify visible wear, fluid leaks, structural cracks, or abnormal discoloration. Provide probable cause and immediate action.",
-                    "images": [tmp_path]
+                    "content": f"You are MechMind AI, an expert heavy machinery diagnostic system. Inspect this machinery component photo carefully. Operator note: '{user_caption}'. Identify visible component type, surface wear, fluid leaks, structural cracks, corrosion, or thermal discoloration. State the probable mechanical cause and recommended technician action in concise plain text.",
+                    "images": [img_b64]
                 }]
             )
-            vision_response = res.message.content
+            if hasattr(res, 'message') and hasattr(res.message, 'content'):
+                vision_response = res.message.content
+            elif isinstance(res, dict):
+                vision_response = res.get('message', {}).get('content', '')
+            logger.info(f"Vision analysis completed successfully ({len(vision_response or '')} chars)")
     except Exception as e:
         logger.warning(f"Ollama vision inference failed: {e}")
     finally:

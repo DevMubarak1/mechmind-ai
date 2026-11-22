@@ -154,11 +154,11 @@ async function startBot() {
                 continue;
             }
 
-            const msgContent = msg.message;
+            const { unwrapped } = getUnwrappedMessage(msg);
             const text = (
-                msgContent.conversation ||
-                msgContent.extendedTextMessage?.text ||
-                msgContent.imageMessage?.caption ||
+                unwrapped.conversation ||
+                unwrapped.extendedTextMessage?.text ||
+                unwrapped.imageMessage?.caption ||
                 ''
             ).trim();
 
@@ -230,17 +230,57 @@ updateTelemetryCache();
 
 // Quick pattern definitions for sub-10ms fast paths
 const GREETINGS_RE = /^(hi|hello|hey|good\s?(morning|afternoon|evening)|oga|boss|salaam|salam|how\s*far|sup|yo)\b/i;
-const STATUS_RE = /^(status|\/status|cat\s*320\s*status|node-001|check|fleet|telemetry|readings|health|sensor|temp|temperature|vibration)$/i;
+const STATUS_RE = /^(status|\/status|node-001|check|fleet|telemetry|readings|health|sensor|temp|temperature|vibration|machine\s*status|equipment\s*status)$/i;
 const HELP_RE = /^(help|\/help|menu|commands|who\s+are\s+you|what\s+is\s+mechmind|\?)$/i;
+
+
+// Helper to unwrap nested WhatsApp message structures (ephemeral, view-once, etc.)
+function getUnwrappedMessage(msg) {
+    if (!msg || !msg.message) return { unwrapped: {}, syntheticMsg: msg };
+    let content = msg.message;
+    while (
+        content?.ephemeralMessage?.message ||
+        content?.viewOnceMessage?.message ||
+        content?.viewOnceMessageV2?.message ||
+        content?.documentWithCaptionMessage?.message
+    ) {
+        content = content.ephemeralMessage?.message ||
+                  content.viewOnceMessage?.message ||
+                  content.viewOnceMessageV2?.message ||
+                  content.documentWithCaptionMessage?.message;
+    }
+    const syntheticMsg = { ...msg, message: content };
+    return { unwrapped: content, syntheticMsg };
+}
 
 async function handleMessage(msg, sender) {
     const phoneNumber = sender.replace('@s.whatsapp.net', '').replace('@lid', '');
 
     try {
-        const msgContent = msg.message;
+        const { unwrapped, syntheticMsg } = getUnwrappedMessage(msg);
         
-        if (msgContent.conversation || msgContent.extendedTextMessage) {
-            const text = (msgContent.conversation || msgContent.extendedTextMessage?.text || '').trim();
+        // Priority 1: Handle Images (including view-once and captioned photos)
+        if (unwrapped.imageMessage) {
+            console.log('   [MEDIA] Equipment image message received from', sender);
+            await handleImageMessage(syntheticMsg, sender, phoneNumber);
+            return;
+        }
+
+        // Priority 2: Handle Audio / Voice Notes (including PTT voice notes)
+        if (unwrapped.audioMessage) {
+            console.log('   [MEDIA] Voice note / audio message received from', sender);
+            await handleAudioMessage(syntheticMsg, sender, phoneNumber);
+            return;
+        }
+
+        // Priority 3: Text Messages
+        const text = (
+            unwrapped.conversation ||
+            unwrapped.extendedTextMessage?.text ||
+            ''
+        ).trim();
+
+        if (text) {
             const lower = text.toLowerCase();
 
             // FAST-PATH 1: Instant Greetings (< 1ms)
@@ -266,7 +306,7 @@ async function handleMessage(msg, sender) {
                     const tempStatus = r.temperature > 85 ? 'HIGH WARNING' : 'NORMAL';
                     const vibStatus = r.vibration > 2.5 ? 'CRITICAL VIBRATION' : 'STABLE';
                     await sendMessage(sender,
-                        `*MechMind Fleet Telemetry: CAT 320 (NODE-001)*\n\n` +
+                        `*MechMind Fleet Telemetry: Equipment Status (NODE-001)*\n\n` +
                         `- Temperature: ${r.temperature} C (${tempStatus})\n` +
                         `- Vibration: ${r.vibration}g [X:${r.vibration_x} Y:${r.vibration_y} Z:${r.vibration_z}] (${vibStatus})\n` +
                         `- Acoustic Noise: ${r.sound} dB\n` +

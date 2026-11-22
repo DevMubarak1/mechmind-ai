@@ -3,9 +3,12 @@
  * Minimalist Monochrome Aesthetics, High-precision Chart.js, Google Gemma 4 Copilot
  */
 
+// Live backend tunnel — connects Vercel dashboard to real ESP32 sensor data via ngrok
 const API_BASE = window.location.origin.includes('5500') || window.location.origin.includes('3000') 
   ? 'http://localhost:8080' 
-  : window.location.origin;
+  : window.location.origin.includes('localhost:8080') 
+    ? 'http://localhost:8080'
+    : 'https://mason-regardant-sacramentally.ngrok-free.dev';
 
 // State
 let activeEquipmentId = 1;
@@ -360,8 +363,8 @@ function generateDynamicReading(timestamp, equipId = 1) {
   };
 }
 
-// Pre-populate charts with historical data points so they look instantly live and rich
-function seedInitialTelemetry(equipId = 1) {
+// Pre-populate charts with historical data points — prioritizing real sensor data
+async function seedInitialTelemetry(equipId = 1) {
   timeLabels.length = 0;
   vibXData.length = 0;
   vibYData.length = 0;
@@ -370,8 +373,32 @@ function seedInitialTelemetry(equipId = 1) {
   tempData.length = 0;
   soundData.length = 0;
 
+  try {
+    const res = await fetch(`${API_BASE}/api/equipment/${equipId}/readings?limit=22`, {
+      headers: { 'ngrok-skip-browser-warning': '1' }
+    });
+    if (res.ok) {
+      const readings = await res.json();
+      if (readings && readings.length > 0) {
+        const sorted = [...readings].reverse();
+        sorted.forEach(r => {
+          const ax = r.vibration_x !== undefined ? r.vibration_x : 0;
+          const ay = r.vibration_y !== undefined ? r.vibration_y : 0;
+          const az = r.vibration_z !== undefined ? r.vibration_z : 0;
+          const mag = r.vibration || r.vibration_magnitude || 0;
+          pushTelemetry(r.temperature, ax, ay, az, mag, r.sound, r.timestamp);
+        });
+        lastReadingTimestamp = readings[0].timestamp;
+        console.log('[TELEMETRY] Successfully seeded charts with real hardware sensor readings');
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('[TELEMETRY] Seed fallback to simulation:', e.message);
+  }
+
   const now = Date.now();
-  const pointCount = 22; // Pre-fill 22 historical points (44 seconds of history)
+  const pointCount = 22;
   for (let i = pointCount; i >= 0; i--) {
     const ptTime = new Date(now - (i * 2000)).toISOString();
     const pt = generateDynamicReading(ptTime, equipId);
@@ -383,10 +410,8 @@ function seedInitialTelemetry(equipId = 1) {
 function startRealDataPolling() {
   if (pollInterval) clearInterval(pollInterval);
 
-  // Pre-seed full historical waveform curves immediately
   seedInitialTelemetry(activeEquipmentId);
 
-  // Stream updates every 2 seconds — continuously changing and live
   pollInterval = setInterval(() => {
     fetchRealTelemetry(false);
   }, 2000);
@@ -394,49 +419,44 @@ function startRealDataPolling() {
 
 async function fetchRealTelemetry(isInitial) {
   if (isInitial) {
-    seedInitialTelemetry(activeEquipmentId);
+    await seedInitialTelemetry(activeEquipmentId);
     return;
   }
 
-  let usedRealSensor = false;
-
   try {
-    const res = await fetch(`${API_BASE}/api/equipment/${activeEquipmentId}/readings?limit=3`);
+    const res = await fetch(`${API_BASE}/api/equipment/${activeEquipmentId}/readings?limit=3`, {
+      headers: { 'ngrok-skip-browser-warning': '1' }
+    });
     if (res.ok) {
       const readings = await res.json();
       if (readings && readings.length > 0) {
         const latest = readings[0];
-        const ageMs = Date.now() - new Date(latest.timestamp).getTime();
-        // If the hardware node sent fresh data within the last 10 seconds:
-        if (ageMs < 10000 && (!lastReadingTimestamp || latest.timestamp > lastReadingTimestamp)) {
-          const ax = latest.vibration_x !== undefined ? latest.vibration_x : latest.vibration * 0.5;
-          const ay = latest.vibration_y !== undefined ? latest.vibration_y : latest.vibration * 0.4;
-          const az = latest.vibration_z !== undefined ? latest.vibration_z : latest.vibration * 0.7;
+        if (!lastReadingTimestamp || latest.timestamp !== lastReadingTimestamp) {
+          const ax = latest.vibration_x !== undefined ? latest.vibration_x : 0;
+          const ay = latest.vibration_y !== undefined ? latest.vibration_y : 0;
+          const az = latest.vibration_z !== undefined ? latest.vibration_z : 0;
           const mag = latest.vibration || latest.vibration_magnitude || 0;
           pushTelemetry(latest.temperature, ax, ay, az, mag, latest.sound, latest.timestamp);
           lastReadingTimestamp = latest.timestamp;
-          usedRealSensor = true;
         }
+        return; // Success! Always prioritize real hardware readings
       }
     }
   } catch (e) {
-    // Backend offline or unreachable — seamlessly stream dynamic readings
+    // Network or server temporarily down
   }
 
-  // If the physical node is lowkey down or hasn't posted in the last 10s:
-  if (!usedRealSensor) {
-    const nowIso = new Date().toISOString();
-    const pt = generateDynamicReading(nowIso, activeEquipmentId);
-    pushTelemetry(pt.temperature, pt.vibration_x, pt.vibration_y, pt.vibration_z, pt.vibration, pt.sound, pt.timestamp);
-    lastReadingTimestamp = nowIso;
-  }
+  // Fallback to dynamic reading ONLY if no readings exist
+  const nowIso = new Date().toISOString();
+  const pt = generateDynamicReading(nowIso, activeEquipmentId);
+  pushTelemetry(pt.temperature, pt.vibration_x, pt.vibration_y, pt.vibration_z, pt.vibration, pt.sound, pt.timestamp);
 }
 
 
 // Backend & WhatsApp Bot Health Checks (Resilient for Edge & Vercel)
 async function checkSystemHealth() {
   try {
-    const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000), headers: { 'ngrok-skip-browser-warning': '1' } });
     if (res.ok) {
       document.getElementById('backendStatusText').textContent = 'ONLINE';
     } else {
@@ -501,7 +521,7 @@ async function fetchAlerts() {
   ];
 
   try {
-    const res = await fetch(`${API_BASE}/api/alerts?limit=5`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${API_BASE}/api/alerts?limit=5`, { signal: AbortSignal.timeout(2000), headers: { 'ngrok-skip-browser-warning': '1' } });
     if (res.ok) {
       const alerts = await res.json();
       if (alerts && alerts.length > 0) {
@@ -542,15 +562,26 @@ function renderAlertsList(alerts) {
 // Gemma 4 OEM Knowledge Base Fallback & Edge Engine for Static Web Deployments (Vercel)
 function getOfflineGemmaDiagnosis(msg) {
   const q = (msg || '').toLowerCase().trim();
-  const currentTemp = document.getElementById('tempVal') ? document.getElementById('tempVal').textContent : '72.4';
-  const currentVib = document.getElementById('vibVal') ? document.getElementById('vibVal').textContent : '2.18';
+  const currentTemp = document.getElementById('tempVal') ? document.getElementById('tempVal').textContent : '30.1';
+  const currentVib = document.getElementById('vibVal') ? document.getElementById('vibVal').textContent : '1.20';
+
+  // Detect machinery from query dynamically
+  let machineName = 'Heavy Machinery [NODE-001]';
+  if (/\btractor\b/i.test(q)) machineName = 'Agricultural Tractor [NODE-001]';
+  else if (/\bgenerator|gen\b/i.test(q)) machineName = 'Diesel Generator [NODE-001]';
+  else if (/\bloader\b/i.test(q)) machineName = 'Wheel Loader [NODE-001]';
+  else if (/\bdozer|bulldozer\b/i.test(q)) machineName = 'Bulldozer [NODE-001]';
+  else if (/\bexcavator\b/i.test(q)) machineName = 'Hydraulic Excavator [NODE-001]';
+  else if (/\bcrane\b/i.test(q)) machineName = 'Mobile Crane [NODE-001]';
+  else if (/\bforklift\b/i.test(q)) machineName = 'Forklift [NODE-001]';
+  else if (/\btruck\b/i.test(q)) machineName = 'Haul Truck [NODE-001]';
 
   // 1. Greetings & General Inquiries
   if (/^(hi|hello|hey|greetings|morning|afternoon|yo|sup|help|who\s+are\s+you)\b/i.test(q) || q === 'hi' || q === 'hello' || q === 'hey') {
-    return `Hello! MechMind Gemma 4 Telemetry Copilot is online and monitoring Caterpillar 320 [NODE-001].\n\n` +
+    return `Hello! MechMind Gemma 4 Telemetry Copilot is online and monitoring ${machineName}.\n\n` +
       `• Live Asset Status: Temp ${currentTemp}°C · Vibration ${currentVib}g · Normal\n` +
       `• AI Model: Google Gemma 4:E2B Edge Model\n` +
-      `• Knowledge Base: Caterpillar & Komatsu OEM Shop Manuals, SAE J1939 Standards\n\n` +
+      `• Knowledge Base: OEM Technical Manuals (Caterpillar, Komatsu, Perkins, Cummins, John Deere), SAE J1939 Standards\n\n` +
       `How can I assist your diagnostic inspection? You can ask:\n` +
       `1. "How to fix an excavator with overheating issues?"\n` +
       `2. "SPN 100 Low Oil Pressure troubleshooting procedure"\n` +
@@ -560,7 +591,7 @@ function getOfflineGemmaDiagnosis(msg) {
 
   // 2. Overheating & Cooling System Faults
   if (q.includes('overheat') || q.includes('temp') || q.includes('heat') || q.includes('hot') || q.includes('coolant') || q.includes('radiator') || q.includes('water pump') || q.includes('boil')) {
-    return `EXCAVATOR OVERHEATING DIAGNOSTIC & REPAIR PROCEDURE (CAT 320 / KOMATSU PC200):\n\n` +
+    return `${machineName.toUpperCase()} OVERHEATING DIAGNOSTIC & REPAIR PROCEDURE:\n\n` +
       `• Live Machine Telemetry: Current Temp ${currentTemp}°C | Normal Range: 65°C - 80°C | Warning: 85°C | Critical Cutoff: 105°C\n\n` +
       `Step-by-Step Diagnostic & Triage Protocol:\n` +
       `1. Immediate Emergency Safety:\n` +
@@ -603,7 +634,7 @@ function getOfflineGemmaDiagnosis(msg) {
 
   // 5. Hydraulics, Valves, Cylinders, Pressure
   if (q.includes('hydraulic') || q.includes('pump') || q.includes('valve') || q.includes('pressure') || q.includes('spn') || q.includes('cylinder') || q.includes('boom') || q.includes('bucket')) {
-    return `HYDRAULIC SUBSYSTEM DIAGNOSTICS (CAT 320 / KAWASAKI PUMPS):\n\n` +
+    return `HYDRAULIC & POWERTRAIN SUBSYSTEM DIAGNOSTICS:\n\n` +
       `• System Pressure Standard: 34.3 MPa (350 bar / 5,075 psi) Main Relief Valve\n` +
       `• Pilot Operating Pressure: 3.9 MPa (40 bar / 580 psi)\n\n` +
       `Service Checklist:\n` +
@@ -612,14 +643,47 @@ function getOfflineGemmaDiagnosis(msg) {
       `3. Air Bleed Procedure: Loosen air bleed plug on top of main pump casing until bubble-free oil flows before engine startup to avoid dry-run cavitation.`;
   }
 
-  // 6. General Fallback
-  return `MECHMIND GEMMA 4 DIAGNOSTIC COPILOT (EDGE ACTIVE):\n\n` +
-    `Machine: Caterpillar 320 Hydraulic Excavator [NODE-001]\n` +
-    `• Live Telemetry: Temp ${currentTemp}°C | Vibration ${currentVib}g | Status: OPTIMAL\n` +
-    `• AI Engine: Google Gemma 4:E2B Edge Model\n\n` +
-    `I have cross-referenced your query against OEM technical manuals (Caterpillar, Komatsu, Perkins, Cummins):\n` +
-    `• Systematic Recommendation: Verify visual indicators, fluid levels, and check diagnostic trouble codes (DTCs).\n` +
-    `• You can ask me for exact torque values, part numbers, hydraulic pressures, or safety step-by-step procedures for any Caterpillar or Komatsu machinery component.`;
+  // 6. Data-aware diagnostic analysis — reads live sensor values and provides real assessment
+  const temp = parseFloat(currentTemp);
+  const vib = parseFloat(currentVib);
+  const currentSound = document.getElementById('soundVal') ? document.getElementById('soundVal').textContent : '50';
+  const sound = parseFloat(currentSound);
+  const axisReadout = document.getElementById('axisReadout') ? document.getElementById('axisReadout').textContent : 'X: 0.0 · Y: -0.1 · Z: -1.2';
+
+  // Build intelligent assessment based on actual sensor values
+  let tempStatus = 'NORMAL — Within optimal operating range.';
+  let tempAction = 'No thermal action required. Continue standard operations.';
+  if (temp > 85) { tempStatus = 'WARNING — Approaching thermal limit.'; tempAction = 'Reduce load. Check coolant level, radiator fins for blockage, and fan belt tension. Idle at 1,000 RPM for 3-5 min if above 90°C.'; }
+  else if (temp > 105) { tempStatus = 'CRITICAL — Immediate shutdown required.'; tempAction = 'STOP operations. Engine is at risk of head gasket failure and bearing seizure. Do NOT remove radiator cap while hot.'; }
+  else if (temp < 20) { tempStatus = 'ENGINE COLD / IDLE — Not at operating temperature.'; tempAction = 'Machine is at ambient temperature or engine is off. Normal for pre-startup. Allow engine to warm to 65-80°C before loading.'; }
+
+  let vibStatus = 'NOMINAL — Within ISO 10816 Class II tolerance.';
+  let vibAction = 'No vibration anomaly detected. Bearings, couplings, and mounts appear healthy.';
+  if (vib > 4.5) { vibStatus = 'ELEVATED — Exceeds operational threshold (4.5g).'; vibAction = 'Inspect engine mounts (M20 bolts at 380 Nm), hydraulic pump coupling spider, and slew ring bearing clearance. Possible imbalance or component loosening.'; }
+  else if (vib > 2.5) { vibStatus = 'ADVISORY — Above baseline, monitor closely.'; vibAction = 'Check pump coupling dampener wear, fan blade balance, and track tension. Run baseline comparison over next 2 hours.'; }
+
+  let soundStatus = 'NORMAL — Within expected acoustic envelope.';
+  if (sound > 90) { soundStatus = 'HIGH — Possible mechanical knock or cavitation.'; }
+  else if (sound > 75) { soundStatus = 'ELEVATED — Monitor for developing anomaly.'; }
+
+  return `MECHMIND GEMMA 4 — LIVE TELEMETRY DIAGNOSTIC REPORT:\n\n` +
+    `Machine: ${machineName}\n` +
+    `Sensors: ESP32 Edge Node (ADXL345 + DS18B20 + INMP441)\n\n` +
+    `THERMAL ANALYSIS (DS18B20 Digital Probe):\n` +
+    `- Current Reading: ${currentTemp}°C | Operating Range: 65-80°C\n` +
+    `- Assessment: ${tempStatus}\n` +
+    `- Action: ${tempAction}\n\n` +
+    `VIBRATION ANALYSIS (ADXL345 3-Axis Accelerometer):\n` +
+    `- RMS Magnitude: ${currentVib}g | Tri-Axis: ${axisReadout}\n` +
+    `- Assessment: ${vibStatus}\n` +
+    `- Action: ${vibAction}\n\n` +
+    `ACOUSTIC ANALYSIS (INMP441 MEMS Microphone):\n` +
+    `- Sound Pressure: ${currentSound} dB | ${soundStatus}\n\n` +
+    `OVERALL MACHINE HEALTH: ${temp < 85 && vib < 4.5 ? 'OPERATIONAL — All parameters within normal limits. No faults detected.' : 'ATTENTION REQUIRED — Review flagged parameters above.'}\n\n` +
+    `You can also ask me specific questions like:\n` +
+    `- "SPN 100 oil pressure troubleshooting"\n` +
+    `- "How to fix hydraulic pump cavitation"\n` +
+    `- "Bearing wear inspection procedure"`;
 }
 
 function getOfflineGemmaVisionDiagnosis(caption) {
@@ -705,7 +769,7 @@ function setupEventListeners() {
 
     input.value = '';
 
-    const isStaticDeployment = window.location.origin.includes('vercel.app') || !window.location.origin.includes('localhost');
+    const isStaticDeployment = false; // ngrok tunnel active — always try real backend first
 
     // If an image was attached, submit via multimodal image diagnostic endpoint
     if (currentAttachedFile) {
@@ -778,13 +842,13 @@ function setupEventListeners() {
     try {
       const res = await fetch(`${API_BASE}/api/diagnose`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
         body: JSON.stringify({
           phone_number: '+2347010299562',
           message: msg,
           equipment_id: activeEquipmentId
         }),
-        signal: AbortSignal.timeout(3000)
+        signal: AbortSignal.timeout(30000)
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
